@@ -1,0 +1,28 @@
+# dependências
+/node_modules
+
+# build / cache
+/.next
+/out
+*.tsbuildinfo
+next-env.d.ts
+
+# ambiente
+.env
+.env.local
+.env*.local
+
+# logs
+npm-debug.log*
+*.log
+
+# SO
+Thumbs.db
+.DS_Store
+
+# screenshots / scratch
+/.shots
+
+# dados reais da empresa — manter local, fora do repositório
+/razao_projeto.xlsx
+/fixtures/razao_exemplo.xlsx

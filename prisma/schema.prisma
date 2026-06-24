@@ -1,0 +1,220 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  criadoEm     DateTime @default(now())
+}
+
+model ImportacaoRazao {
+  id               String   @id @default(cuid())
+  nomeArquivo      String
+  empresa          String
+  cnpjEmpresa      String
+  periodo          Json // { inicio: Date, fim: Date }
+  status           ImportacaoStatus @default(PROCESSANDO)
+  totalLinhas      Int      @default(0)
+  linhasImportadas Int      @default(0)
+  erros            Json?
+  criadoEm         DateTime @default(now())
+  lancamentos      Lancamento[]
+  sessoesConciliacao SessaoConciliacao[]
+}
+
+model ContaContabil {
+  id            String   @id @default(cuid())
+  codigo        String   @unique
+  nome          String
+  saldoAnterior Decimal  @default(0) @db.Decimal(18, 2)
+  lancamentos   Lancamento[]
+  comparacoesOrigem  SessaoComparacao[] @relation("ComparacaoOrigem")
+  comparacoesDestino SessaoComparacao[] @relation("ComparacaoDestino")
+}
+
+model Lancamento {
+  id                String   @id @default(cuid())
+  importacaoId      String
+  contaContabilId   String
+  dataLancamento    DateTime
+  documento         String
+  historicoPadrao   String
+  complemento       String?
+  contaIntegracao   String?
+  centroCusto       String?
+  descCentroCusto   String?
+  ficha             String?
+  sequencia         Int?
+  debito            Decimal  @default(0) @db.Decimal(18, 2)
+  credito           Decimal  @default(0) @db.Decimal(18, 2)
+  saldo             Decimal  @db.Decimal(18, 2)
+  natureza          NaturezaLancamento
+  // Tokens extraídos do complemento
+  dupCr             String?
+  parcela           String?
+  vencimento        DateTime?
+  cnpjParceiro      String?
+  nomeParceiro      String?
+  idDupCr           String?
+  ordemFaturamento  String?
+  doctoBaixa        String?
+  bancoBaixa        String?
+  ccBaixa           String?
+  idBaixa           String?
+  nrAdiantamento    String?
+  // Conciliação
+  statusConciliacao StatusConciliacao @default(PENDENTE)
+  parConciliadoId   String?
+  parConciliado     ParConciliacao? @relation("LancamentoPar", fields: [parConciliadoId], references: [id])
+  importacao        ImportacaoRazao @relation(fields: [importacaoId], references: [id])
+  contaContabil     ContaContabil @relation(fields: [contaContabilId], references: [id])
+  criadoEm          DateTime @default(now())
+  // Comparação entre contas
+  paresComoA        ParComparacao[] @relation("ParCompA")
+  paresComoB        ParComparacao[] @relation("ParCompB")
+
+  @@index([importacaoId])
+  @@index([contaContabilId])
+  @@index([dupCr])
+  @@index([idBaixa])
+}
+
+model ParConciliacao {
+  id              String   @id @default(cuid())
+  sessaoId        String
+  tipoMatch       TipoMatch
+  scoreConfianca  Float
+  diferencaValor  Decimal  @default(0) @db.Decimal(18, 2)
+  statusAprovacao StatusAprovacao @default(PENDENTE)
+  observacao      String?
+  aprovadoPor     String?
+  aprovadoEm      DateTime?
+  lancamentos     Lancamento[] @relation("LancamentoPar")
+  sessao          SessaoConciliacao @relation(fields: [sessaoId], references: [id])
+  criadoEm        DateTime @default(now())
+}
+
+model SessaoConciliacao {
+  id             String   @id @default(cuid())
+  importacaoId   String
+  status         SessaoStatus @default(PROCESSANDO)
+  totalPares     Int      @default(0)
+  paresAutomatic Int      @default(0)
+  paresManuais   Int      @default(0)
+  divergencias   Int      @default(0)
+  criadoEm       DateTime @default(now())
+  importacao     ImportacaoRazao @relation(fields: [importacaoId], references: [id])
+  pares          ParConciliacao[]
+}
+
+// Sessão de comparação entre duas contas distintas
+model SessaoComparacao {
+  id               String   @id @default(cuid())
+  empresaId        String? // referência livre à empresa/filial (sem model próprio no MVP)
+  nomeDescritivo   String // ex: "Fornecedores × Banco - Maio/2026"
+  cenario          CenarioComparacao
+  contaOrigemId    String // conta A (ex: fornecedores)
+  contaDestinoId   String // conta B (ex: banco)
+  periodoInicio    DateTime
+  periodoFim       DateTime
+  status           SessaoStatus @default(PROCESSANDO)
+  totalParesA      Int      @default(0) // lançamentos na conta A
+  totalParesB      Int      @default(0) // lançamentos na conta B
+  paresEncontrados Int      @default(0)
+  semParA          Int      @default(0) // A sem contrapartida em B
+  semParB          Int      @default(0) // B sem contrapartida em A
+  valorDivergente  Decimal  @default(0) @db.Decimal(18, 2)
+  criadoEm         DateTime @default(now())
+  concluidoEm      DateTime?
+  contaOrigem      ContaContabil @relation("ComparacaoOrigem", fields: [contaOrigemId], references: [id])
+  contaDestino     ContaContabil @relation("ComparacaoDestino", fields: [contaDestinoId], references: [id])
+  pares            ParComparacao[]
+
+  @@index([contaOrigemId, contaDestinoId])
+}
+
+// Par identificado entre as duas contas
+model ParComparacao {
+  id             String   @id @default(cuid())
+  sessaoId       String
+  lancamentoAId  String? // null = sem par em A
+  lancamentoBId  String? // null = sem par em B
+  tipoMatch      TipoMatch
+  scoreConfianca Float
+  diferencaValor Decimal  @default(0) @db.Decimal(18, 2)
+  diferencaDias  Int      @default(0) // defasagem de data entre os pares
+  status         StatusParComparacao @default(PENDENTE)
+  motivoRejeicao String?
+  aprovadoPor    String?
+  aprovadoEm     DateTime?
+  observacao     String?
+  criadoEm       DateTime @default(now())
+  sessao         SessaoComparacao @relation(fields: [sessaoId], references: [id])
+  lancamentoA    Lancamento? @relation("ParCompA", fields: [lancamentoAId], references: [id])
+  lancamentoB    Lancamento? @relation("ParCompB", fields: [lancamentoBId], references: [id])
+
+  @@index([sessaoId])
+}
+
+enum CenarioComparacao {
+  FORNECEDORES_BANCO
+  CLIENTES_BANCO
+  INTERCOMPANY
+  PERSONALIZADO
+}
+
+enum StatusParComparacao {
+  PENDENTE
+  APROVADO
+  REJEITADO
+  IGNORADO
+}
+
+enum ImportacaoStatus {
+  PROCESSANDO
+  CONCLUIDA
+  ERRO
+}
+
+enum StatusConciliacao {
+  PENDENTE
+  CONCILIADO
+  DIVERGENCIA
+  IGNORADO
+}
+
+enum StatusAprovacao {
+  PENDENTE
+  APROVADO
+  REJEITADO
+}
+
+enum TipoMatch {
+  AUTOMATICO_EXATO
+  AUTOMATICO_FUZZY
+  MANUAL
+}
+
+enum SessaoStatus {
+  PROCESSANDO
+  CONCLUIDA
+  PARCIAL
+}
+
+enum NaturezaLancamento {
+  BAIXA_CLIENTE
+  BAIXA_FORNECEDOR
+  NF_SAIDA
+  NF_ENTRADA
+  CONTRAPARTIDA_BAIXA_FORNECEDOR
+  CONTRAPARTIDA_NF_SAIDA
+  OUTRO
+}
