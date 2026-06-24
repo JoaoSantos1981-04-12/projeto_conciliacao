@@ -93,7 +93,7 @@ describe('conciliar', () => {
 })
 
 describe('conciliar (arquivo real)', () => {
-  it('concilia o razão da HAILO de forma íntegra', () => {
+  it('concilia o razão de referência de forma íntegra', () => {
     const buf = readFileSync(join(process.cwd(), 'fixtures/razao_exemplo.xlsx'))
     const parsed = parseRazaoExcel(buf)
     const lancs = parsed.contas[0].lancamentos.map((l, i) => conciliavelDeRazao(l, `L${i}`))

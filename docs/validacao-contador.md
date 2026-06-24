@@ -3,7 +3,7 @@
 > **Objetivo:** obter o aval do Contador Sênior **antes** de implementar o engine de
 > conciliação (Sprint B). Abaixo estão (A) os achados do parser que precisam de confirmação
 > contábil e (B) as regras de matching com as premissas a validar. Base: razão real da
-> **HAILO SISTEMAS METALICOS LTDA**, conta `1.1.02.0101.100005 – DOMESTIC CUSTOMERS`,
+> **NCC SISTEMAS METALICOS LTDA**, conta `1.1.02.0101.100005 – DOMESTIC CUSTOMERS`,
 > período 01/01/2026 a 31/05/2026 (165 lançamentos).
 
 ---

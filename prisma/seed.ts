@@ -5,7 +5,7 @@ const prisma = new PrismaClient()
 
 // Valores padrão servem ao desenvolvimento local. Em produção, defina
 // ADMIN_EMAIL / ADMIN_PASSWORD (e opcionalmente ADMIN_NAME) no ambiente.
-const DEFAULT_EMAIL = 'admin@hailo.com.br'
+const DEFAULT_EMAIL = 'admin@ncc.com.br'
 const DEFAULT_PASSWORD = 'conciliacao123'
 const DEFAULT_NAME = 'Administrador'
 

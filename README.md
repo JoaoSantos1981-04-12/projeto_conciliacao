@@ -41,7 +41,7 @@ cp .env.example .env        # edite DATABASE_URL e NEXTAUTH_SECRET
 # 3. Banco: aplica as migrations
 npx prisma migrate deploy
 
-# 4. Usuário admin (default dev: admin@hailo.com.br / conciliacao123)
+# 4. Usuário admin (default dev: admin@ncc.com.br / conciliacao123)
 npx prisma db seed
 
 # 5. Sobe a aplicação

@@ -14,7 +14,7 @@ describe('classificarFaixa', () => {
 
 const meta: MetaRelatorio = {
   importacaoId: 'imp1',
-  empresa: 'HAILO',
+  empresa: 'NCC',
   periodo: { inicio: '2026-01-01', fim: '2026-05-31' },
 }
 

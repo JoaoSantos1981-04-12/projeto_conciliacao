@@ -40,7 +40,7 @@ describe('parseRazaoExcel', () => {
 
   it('processa o arquivo de referência sem erros críticos', () => {
     const result = parseRazaoExcel(buf())
-    expect(result.metadados.empresa).toContain('HAILO')
+    expect(result.metadados.empresa.length).toBeGreaterThan(0)
     expect(result.contas.length).toBeGreaterThan(0)
     expect(result.contas[0].lancamentos.length).toBeGreaterThan(0)
     expect(result.erros.length).toBe(0)

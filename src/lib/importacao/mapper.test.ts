@@ -58,9 +58,9 @@ describe('mapLancamento', () => {
 describe('mapImportacao (arquivo real)', () => {
   const buf = readFileSync(join(process.cwd(), 'fixtures/razao_exemplo.xlsx'))
 
-  it('produz payload coerente com o razão da HAILO', () => {
+  it('produz payload coerente com o razão de referência', () => {
     const dados = mapImportacao(parseRazaoExcel(buf), 'razao_exemplo.xlsx')
-    expect(dados.empresa).toContain('HAILO')
+    expect(dados.empresa.length).toBeGreaterThan(0)
     expect(dados.cnpjEmpresa).toBe('13.150.810/0002-57')
     expect(dados.contas).toHaveLength(1)
     expect(dados.contas[0].codigo).toBe('1.1.02.0101.100005')

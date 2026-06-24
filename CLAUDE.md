@@ -6,7 +6,7 @@ Aplicação web para **conciliação contábil automática** baseada em exporta�
 em Excel. O MVP foca exclusivamente no layout de arquivo já mapeado (ver seção "Formato do Arquivo").
 Integração via API do ERP será implementada em versão posterior.
 
-Empresa de referência para testes: **HAILO SISTEMAS METALICOS LTDA (001-001)**
+Empresa de referência para testes: **NCC SISTEMAS METALICOS LTDA (001-001)**
 Conta de referência: `1.1.02.0101.100005 – DOMESTIC CUSTOMERS`
 Período analisado: `01/01/2026 a 31/05/2026`
 
@@ -96,7 +96,7 @@ idênticos intercalados entre os lançamentos. O parser DEVE detectar essas queb
 
 ### ⚠️ Correções validadas contra o arquivo real (jun/2026)
 
-Ao implementar o parser contra `razao_projeto.xlsx` (HAILO, 174 linhas), foram encontradas
+Ao implementar o parser contra `razao_projeto.xlsx` (NCC, 174 linhas), foram encontradas
 **5 divergências entre esta spec original e o arquivo real**. O código em `src/lib/parser/`
 já reflete a realidade; a tabela abaixo é a fonte de verdade:
 
@@ -108,7 +108,7 @@ já reflete a realidade; a tabela abaixo é a fonte de verdade:
 | 4 | Débito/crédito/saldo todos em reais | **DÉBITO/CRÉDITO em CENTAVOS** (inteiro + `,00`); **SALDO em reais** | `debito`/`credito` ÷ 100; saldo intacto. Reconciliação fecha 165/165 |
 | 5 | Regex de complemento `[A-Z_.]+...:([^/]+?)` | Não casava `CNPJ/CPF` (sem `/`) e truncava no 1º `/` | Regex corrigido (abaixo); cobre a variante `DUP:` da filial 001-002 |
 
-Outros fatos reais: CNPJ da HAILO = `13.150.810/0002-57`; o campo `HISTÓRICO PADRÃO`
+Outros fatos reais: CNPJ da NCC = `13.150.810/0002-57`; o campo `HISTÓRICO PADRÃO`
 (coluna 2) vem com o **complemento concatenado** — o complemento isolado está na coluna 3,
 que é a usada para extrair tokens.
 
@@ -726,7 +726,7 @@ describe('parseRazaoExcel', () => {
   it('processa o arquivo de referência sem erros críticos', () => {
     const buf = readFileSync(join(process.cwd(), 'fixtures/razao_exemplo.xlsx'))
     const result = parseRazaoExcel(buf)
-    expect(result.metadados.empresa).toContain('HAILO')
+    expect(result.metadados.empresa).toContain('NCC')
     expect(result.contas.length).toBeGreaterThan(0)
     expect(result.contas[0].lancamentos.length).toBeGreaterThan(0)
     expect(result.erros.length).toBe(0)
@@ -819,7 +819,7 @@ regra de centavos (item 4 das correções) e as direções/tolerâncias de match
 ## Arquivo de Referência
 
 O arquivo `fixtures/razao_exemplo.xlsx` é a fonte de verdade para todos os testes.
-É o razão contábil real da HAILO SISTEMAS METALICOS LTDA, período jan–mai/2026
+É o razão contábil real da NCC SISTEMAS METALICOS LTDA, período jan–mai/2026
 (cópia de `razao_projeto.xlsx`, na raiz do projeto).
 
 Características do arquivo que o parser DEVE suportar:
