@@ -13,7 +13,7 @@ import {
  * NÃO do `contaContabilId` (que é um CUID).
  */
 export type LancamentoComConta = Lancamento & {
-  contaContabil: Pick<ContaContabil, 'codigo' | 'nome'>
+  contaContabil: Pick<ContaContabil, 'codigo' | 'nome' | 'saldoAnterior'>
 }
 
 /**
@@ -44,48 +44,74 @@ export function classificarConta(codigo: string): ContaClassificacao {
 }
 
 /**
- * Agregador de valores por conta.
+ * Agregador de valores por conta (regra validada com o Contador Sênior — 2026-06-26).
  *
- * ⚠️ PENDENTE DE VALIDAÇÃO COM O CONTADOR SÊNIOR (semântica de agregação).
- * Hoje esta função SOMA a coluna `saldo` de todos os lançamentos da conta.
- * Validado contra o banco real (importação HAILO, 165 lançamentos, conta
- * 1.1.02.0101.100005): isso produz `ativoTotal = -453.687.466,15`, que NÃO
- * tem significado contábil — `saldo` é o SALDO CORRENTE ACUMULADO (running
- * balance) linha a linha (ver CLAUDE.md), então somá-lo é incorreto.
+ * NÃO somar a coluna `saldo` (é o SALDO CORRENTE ACUMULADO/running balance linha
+ * a linha — somá-lo não tem significado contábil). Em vez disso, por classe:
+ *   - Posição (Ativo/Passivo/PL/Outro): `saldoAnterior + Σdébito − Σcrédito`.
+ *     Isso reproduz o saldo final da conta (a mesma fórmula que o ERP usa para
+ *     o running balance; reconciliação `saldo = anterior + déb − créd` fecha
+ *     165/165 no arquivo real — ver CLAUDE.md).
+ *   - Fluxo (Receita/Despesa): somar a MOVIMENTAÇÃO do período — Receita = Σcrédito,
+ *     Despesa = Σdébito.
  *
- * A regra correta provavelmente é, por classe de conta:
- *   - Contas de posição (Ativo/Passivo/PL): usar o SALDO FINAL (último
- *     lançamento cronológico) — ou `saldoAnterior + Σdébito − Σcrédito`.
- *   - Contas de fluxo (Receita/Despesa): somar a MOVIMENTAÇÃO (débito/crédito),
- *     não o saldo.
- * Não alterar até o Contador Sênior confirmar (mesma frente da regra de
- * centavos). Ver memória do projeto: [[fib-implementation]].
+ * ⚠️ Premissa: `saldoAnterior` é o saldo de abertura da conta. Logo, a posição
+ * só fica exata quando o período cobre a conta desde o início. Para sub-períodos
+ * arbitrários o saldo de abertura do recorte não é conhecido (limitação aceita
+ * no MVP). Ver memória [[fib-implementation]].
  */
 function agregasPorConta(lancamentos: LancamentoComConta[]): Map<
   string,
   { nome: string; saldo: number; natureza: ContaClassificacao }
 > {
-  const mapa = new Map<
+  // Acumula movimentação por conta + captura o saldo de abertura.
+  const acc = new Map<
     string,
-    { nome: string; saldo: number; natureza: ContaClassificacao }
+    {
+      nome: string
+      natureza: ContaClassificacao
+      saldoAnterior: number
+      debito: number
+      credito: number
+    }
   >()
 
   for (const lancamento of lancamentos) {
     // Classifica pelo código contábil (ex.: "1.1.02..."), não pelo CUID.
     const codigo = lancamento.contaContabil.codigo
-    const classificacao = classificarConta(codigo)
 
-    if (!mapa.has(codigo)) {
-      mapa.set(codigo, {
+    if (!acc.has(codigo)) {
+      acc.set(codigo, {
         nome: lancamento.contaContabil.nome,
-        saldo: 0,
-        natureza: classificacao,
+        natureza: classificarConta(codigo),
+        saldoAnterior: Number(lancamento.contaContabil.saldoAnterior),
+        debito: 0,
+        credito: 0,
       })
     }
 
-    const entrada = mapa.get(codigo)!
-    // saldo é Decimal no Prisma — converter para number do domínio.
-    entrada.saldo += Number(lancamento.saldo)
+    const entrada = acc.get(codigo)!
+    // Decimal do Prisma → number do domínio.
+    entrada.debito += Number(lancamento.debito)
+    entrada.credito += Number(lancamento.credito)
+  }
+
+  // Converte a movimentação acumulada no valor agregado conforme a classe.
+  const mapa = new Map<
+    string,
+    { nome: string; saldo: number; natureza: ContaClassificacao }
+  >()
+  for (const [codigo, e] of acc) {
+    let valor: number
+    if (e.natureza === ContaClassificacao.RECEITA) {
+      valor = e.credito
+    } else if (e.natureza === ContaClassificacao.DESPESA) {
+      valor = e.debito
+    } else {
+      // Posição: saldoAnterior + Σdébito − Σcrédito
+      valor = e.saldoAnterior + e.debito - e.credito
+    }
+    mapa.set(codigo, { nome: e.nome, saldo: valor, natureza: e.natureza })
   }
 
   return mapa
@@ -209,10 +235,10 @@ export function agregarContas(
  * Agrupa os lançamentos por mês (competência) e agrega por classe, gerando a
  * série temporal usada nos gráficos de crescimento (CEO/CFO).
  *
- * ⚠️ Herda a mesma agregação pendente de validação contábil (soma de `saldo`)
- * descrita em `agregasPorConta`. Substitui os dados antes MOCKADOS por valores
- * derivados dos lançamentos reais; quando a regra de agregação for confirmada,
- * basta ajustar aqui também.
+ * Usa a movimentação do mês (mesma regra de fluxo de `agregasPorConta`):
+ * Receita = Σcrédito, Despesa = Σdébito. O `ativo` mensal é a movimentação
+ * líquida (Σdébito − Σcrédito) das contas de ativo no mês — um delta de
+ * posição, não o saldo acumulado.
  */
 export function calcularSerieMensal(
   lancamentos: LancamentoComConta[]
@@ -234,11 +260,12 @@ export function calcularSerieMensal(
     }
     const ponto = porMes.get(chave)!
     const classe = classificarConta(l.contaContabil.codigo)
-    const valor = Number(l.saldo)
+    const debito = Number(l.debito)
+    const credito = Number(l.credito)
 
-    if (classe === ContaClassificacao.RECEITA) ponto.receitas += valor
-    else if (classe === ContaClassificacao.DESPESA) ponto.despesas += valor
-    else if (classe === ContaClassificacao.ATIVO) ponto.ativo += valor
+    if (classe === ContaClassificacao.RECEITA) ponto.receitas += credito
+    else if (classe === ContaClassificacao.DESPESA) ponto.despesas += debito
+    else if (classe === ContaClassificacao.ATIVO) ponto.ativo += debito - credito
   }
 
   return Array.from(porMes.entries())

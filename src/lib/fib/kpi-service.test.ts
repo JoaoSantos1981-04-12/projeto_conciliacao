@@ -9,17 +9,20 @@ import {
 } from './kpi-service'
 import { ContaClassificacao, FibKpi } from '@/lib/types/fib'
 
-// Factory mínimo: as funções só leem dataLancamento, saldo e contaContabil.
+// Factory mínimo: as funções leem dataLancamento, débito/crédito e a conta
+// (código/nome/saldoAnterior). `saldo` (running balance) não é mais usado.
 function lanc(
   codigo: string,
-  saldo: number,
+  mov: { debito?: number; credito?: number; saldoAnterior?: number },
   data = '2026-01-15',
   nome = codigo
 ): LancamentoComConta {
   return {
     dataLancamento: new Date(data),
-    saldo,
-    contaContabil: { codigo, nome },
+    debito: mov.debito ?? 0,
+    credito: mov.credito ?? 0,
+    saldo: 0,
+    contaContabil: { codigo, nome, saldoAnterior: mov.saldoAnterior ?? 0 },
   } as unknown as LancamentoComConta
 }
 
@@ -50,12 +53,15 @@ describe('classificarConta', () => {
 })
 
 describe('agregarContas', () => {
-  it('agrupa por código, classifica e calcula o percentual da classe', () => {
+  it('agrega posição por saldoAnterior + Σdébito − Σcrédito e calcula o percentual', () => {
     const lancs = [
-      lanc('1.1.01', 100),
-      lanc('1.1.01', 50), // mesma conta soma
-      lanc('1.2.01', 50),
-      lanc('4.1.01', 200),
+      // conta 1.1.01: abertura 100, +60 débito, −10 crédito => 150
+      lanc('1.1.01', { saldoAnterior: 100, debito: 60 }),
+      lanc('1.1.01', { credito: 10 }),
+      // conta 1.2.01: abertura 50 => 50
+      lanc('1.2.01', { saldoAnterior: 50 }),
+      // receita: Σcrédito = 200
+      lanc('4.1.01', { credito: 200 }),
     ]
     const r = agregarContas(lancs)
 
@@ -65,10 +71,14 @@ describe('agregarContas', () => {
     // 150 de 200 (150+50) na classe ATIVO = 75%
     expect(conta1?.percentualDaClasse).toBeCloseTo(75, 1)
     expect(r[ContaClassificacao.RECEITA]).toHaveLength(1)
+    expect(r[ContaClassificacao.RECEITA][0].saldo).toBe(200)
   })
 
   it('ordena contas por saldo absoluto decrescente', () => {
-    const r = agregarContas([lanc('1.1.01', 30), lanc('1.2.01', 90)])
+    const r = agregarContas([
+      lanc('1.1.01', { saldoAnterior: 30 }),
+      lanc('1.2.01', { saldoAnterior: 90 }),
+    ])
     expect(r[ContaClassificacao.ATIVO][0].codigo).toBe('1.2.01')
   })
 })
@@ -76,10 +86,10 @@ describe('agregarContas', () => {
 describe('calcularKpis', () => {
   it('deriva receitas, despesas, EBITDA e margem', () => {
     const lancs = [
-      lanc('4.1.01', 1000), // receita
-      lanc('5.1.01', 400), // despesa
-      lanc('1.1.01', 5000), // ativo
-      lanc('2.1.01', 2000), // passivo
+      lanc('4.1.01', { credito: 1000 }), // receita = Σcrédito
+      lanc('5.1.01', { debito: 400 }), // despesa = Σdébito
+      lanc('1.1.01', { saldoAnterior: 5000 }), // ativo (posição)
+      lanc('2.1.01', { saldoAnterior: 2000 }), // passivo (posição)
     ]
     const kpis = calcularKpis(lancs, 'imp1', periodo)
 
@@ -94,7 +104,11 @@ describe('calcularKpis', () => {
   })
 
   it('evita divisão por zero quando não há receitas', () => {
-    const kpis = calcularKpis([lanc('1.1.01', 100)], 'imp1', periodo)
+    const kpis = calcularKpis(
+      [lanc('1.1.01', { saldoAnterior: 100 })],
+      'imp1',
+      periodo
+    )
     expect(kpis.margemLiquida).toBe(0)
     expect(kpis.roi).toBe(0)
   })
@@ -103,9 +117,9 @@ describe('calcularKpis', () => {
 describe('calcularSerieMensal', () => {
   it('agrupa por mês de competência e ordena cronologicamente', () => {
     const lancs = [
-      lanc('4.1', 100, '2026-03-10'),
-      lanc('4.1', 50, '2026-01-20'),
-      lanc('5.1', 30, '2026-01-25'),
+      lanc('4.1', { credito: 100 }, '2026-03-10'),
+      lanc('4.1', { credito: 50 }, '2026-01-20'),
+      lanc('5.1', { debito: 30 }, '2026-01-25'),
     ]
     const serie = calcularSerieMensal(lancs)
 

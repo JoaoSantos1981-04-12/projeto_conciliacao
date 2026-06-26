@@ -61,9 +61,12 @@ export async function GET(req: NextRequest) {
               lte: periodoFim ? new Date(periodoFim) : undefined,
             },
           },
-          // Carrega o código/nome da conta para a classificação CPC.
+          // Carrega código/nome para a classificação CPC e o saldoAnterior
+          // para a agregação de posição (saldoAnterior + Σdébito − Σcrédito).
           include: {
-            contaContabil: { select: { codigo: true, nome: true } },
+            contaContabil: {
+              select: { codigo: true, nome: true, saldoAnterior: true },
+            },
           },
         },
       },
