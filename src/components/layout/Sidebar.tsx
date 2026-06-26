@@ -8,10 +8,11 @@ import {
   FileUp, 
   Database, 
   CheckCircle2, 
-  ArrowLeftRight, 
-  BookOpen, 
-  BarChart3, 
-  ChevronLeft, 
+  ArrowLeftRight,
+  BookOpen,
+  BarChart3,
+  LineChart,
+  ChevronLeft,
   ChevronRight,
   LogOut,
   Menu,
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { href: '/comparacao', label: 'Comparação', Icon: ArrowLeftRight },
   { href: '/book', label: 'Book Digital', Icon: BookOpen },
   { href: '/relatorios', label: 'Relatórios', Icon: BarChart3 },
+  { href: '/fib/geral', label: 'Inteligência Financeira', Icon: LineChart },
 ]
 
 interface SidebarProps {
