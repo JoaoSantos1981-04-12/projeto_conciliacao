@@ -26,3 +26,4 @@ Thumbs.db
 # dados reais da empresa — manter local, fora do repositório
 /razao_projeto.xlsx
 /fixtures/razao_exemplo.xlsx
+/docs/PDFs Exemplo/

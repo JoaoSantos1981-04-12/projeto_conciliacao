@@ -8,6 +8,7 @@ import {
 import { FiltrosLancamentos } from '@/components/lancamentos/FiltrosLancamentos'
 import { formatBRL, formatData, NATUREZA_LABEL, STATUS_LABEL } from '@/lib/format'
 import { NaturezaLancamento } from '@/lib/types/razao'
+import { FileUp, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
 
 export const metadata = { title: 'Lançamentos · Conciliação Contábil' }
 export const dynamic = 'force-dynamic'
@@ -54,111 +55,156 @@ export default async function LancamentosPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Lançamentos</h1>
-          <p className="mt-1 text-sm text-slate-600">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Lançamentos</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             {dados ? `${dados.total} lançamento(s)` : 'Lançamentos importados'} · página {filtros.page} de {totalPaginas}
           </p>
         </div>
-        <Link href="/importacao" className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
-          Nova importação
+        <Link 
+          href="/importacao" 
+          className="inline-flex items-center gap-2 rounded-lg bg-emeraldBlue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emeraldBlue-700 transition active:translate-y-px dark:bg-emeraldBlue-600 dark:hover:bg-emeraldBlue-500"
+        >
+          <FileUp className="h-4 w-4" />
+          Nova Importação
         </Link>
       </div>
 
       {erroDb ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          Não foi possível consultar o banco de dados. Verifique se o PostgreSQL está ativo e se as
-          migrations foram aplicadas (<code>npx prisma migrate dev</code>).
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/30 dark:bg-amber-950/20">
+          <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <div className="text-sm text-amber-800 dark:text-amber-300">
+            Não foi possível consultar o banco de dados. Verifique se o PostgreSQL está ativo e se as
+            migrations foram aplicadas (<code>npx prisma migrate dev</code>).
+          </div>
         </div>
       ) : (
         <>
           <FiltrosLancamentos importacoes={dados!.opcoes.importacoes} contas={dados!.opcoes.contas} />
 
-          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-            <table className="w-full table-fixed divide-y divide-slate-200 text-xs">
+          <div className="overflow-x-auto rounded-xl border border-slate-200/60 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-sm transition-colors">
+            <table className="w-full table-fixed divide-y divide-slate-200/50 dark:divide-slate-800 text-xs">
               <colgroup>
                 <col className="w-[5.5rem]" />
                 <col className="w-[5.5rem]" />
                 <col className="w-[8rem]" />
-                <col />
+                <col className="w-[14rem]" />
                 <col className="w-[6rem]" />
                 <col className="w-[7rem]" />
                 <col className="w-[7rem]" />
                 <col className="w-[7.5rem]" />
-                <col className="w-[6rem]" />
+                <col className="w-[6.5rem]" />
               </colgroup>
-              <thead className="bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
+              <thead className="bg-slate-50/70 text-left text-[11px] uppercase tracking-wider text-slate-500 dark:bg-slate-800/40 dark:text-slate-400">
                 <tr>
-                  <th className="px-2 py-2 font-medium">Data</th>
-                  <th className="px-2 py-2 font-medium">Documento</th>
-                  <th className="px-2 py-2 font-medium">Natureza</th>
-                  <th className="px-2 py-2 font-medium">Parceiro</th>
-                  <th className="px-2 py-2 font-medium">Dup./Parc.</th>
-                  <th className="px-2 py-2 text-right font-medium">Débito</th>
-                  <th className="px-2 py-2 text-right font-medium">Crédito</th>
-                  <th className="px-2 py-2 text-right font-medium">Saldo</th>
-                  <th className="px-2 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2.5 font-semibold">Data</th>
+                  <th className="px-3 py-2.5 font-semibold">Documento</th>
+                  <th className="px-3 py-2.5 font-semibold">Natureza</th>
+                  <th className="px-3 py-2.5 font-semibold">Parceiro</th>
+                  <th className="px-3 py-2.5 font-semibold">Dup./Parc.</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Débito</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Crédito</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Saldo</th>
+                  <th className="px-3 py-2.5 font-semibold">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
                 {dados!.items.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-2 py-10 text-center text-slate-400">
+                    <td colSpan={9} className="px-3 py-10 text-center text-slate-400 dark:text-slate-500">
                       Nenhum lançamento encontrado para os filtros atuais.
                     </td>
                   </tr>
                 ) : (
-                  dados!.items.map((l) => (
-                    <tr key={l.id} className="hover:bg-slate-50">
-                      <td className="whitespace-nowrap px-2 py-2">{formatData(l.dataLancamento)}</td>
-                      <td className="truncate px-2 py-2 font-medium" title={l.documento}>
-                        {l.documento}
-                      </td>
-                      <td className="truncate px-2 py-2 text-slate-600">
-                        {NATUREZA_LABEL[l.natureza as NaturezaLancamento]}
-                      </td>
-                      <td className="truncate px-2 py-2 text-slate-600" title={l.nomeParceiro ?? ''}>
-                        {l.nomeParceiro ?? '—'}
-                      </td>
-                      <td className="truncate px-2 py-2 text-slate-500">
-                        {l.dupCr ? `${l.dupCr}/${l.parcela ?? '-'}` : '—'}
-                      </td>
-                      <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">
-                        {Number(l.debito) ? formatBRL(String(l.debito)) : '—'}
-                      </td>
-                      <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">
-                        {Number(l.credito) ? formatBRL(String(l.credito)) : '—'}
-                      </td>
-                      <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums text-slate-600">
-                        {formatBRL(String(l.saldo))}
-                      </td>
-                      <td className="px-2 py-2">
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
-                          {STATUS_LABEL[l.statusConciliacao] ?? l.statusConciliacao}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                  dados!.items.map((l) => {
+                    // Determina cor do badge com base no status de conciliação
+                    let badgeCls = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                    if (l.statusConciliacao === 'CONCILIADO') {
+                      badgeCls = 'bg-emerald-50 text-emerald-700 border border-emerald-200/40 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30'
+                    } else if (l.statusConciliacao === 'PENDENTE') {
+                      badgeCls = 'bg-amber-50 text-amber-700 border border-amber-200/40 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30'
+                    } else if (l.statusConciliacao === 'DIVERGENCIA') {
+                      badgeCls = 'bg-red-50 text-red-700 border border-red-200/40 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30'
+                    } else if (l.statusConciliacao === 'IGNORADO') {
+                      badgeCls = 'bg-slate-100 text-slate-500 border border-slate-200/30 dark:bg-slate-800/40 dark:text-slate-500 dark:border-slate-800/30'
+                    }
+
+                    return (
+                      <tr key={l.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                        <td className="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-400">{formatData(l.dataLancamento)}</td>
+                        <td className="truncate px-3 py-2 font-medium text-slate-900 dark:text-slate-100" title={l.documento}>
+                          {l.documento}
+                        </td>
+                        <td className="truncate px-3 py-2 text-slate-600 dark:text-slate-400">
+                          {NATUREZA_LABEL[l.natureza as NaturezaLancamento]}
+                        </td>
+                        <td className="truncate px-3 py-2 text-slate-600 dark:text-slate-400 font-medium" title={l.nomeParceiro ?? ''}>
+                          {l.nomeParceiro ?? '—'}
+                        </td>
+                        <td className="truncate px-3 py-2 text-slate-500 dark:text-slate-500">
+                          {l.dupCr ? `${l.dupCr}/${l.parcela ?? '-'}` : '—'}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-200">
+                          {Number(l.debito) ? formatBRL(String(l.debito)) : '—'}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-200">
+                          {Number(l.credito) ? formatBRL(String(l.credito)) : '—'}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums font-medium text-slate-900 dark:text-slate-100">
+                          {formatBRL(String(l.saldo))}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide ${badgeCls}`}>
+                            {STATUS_LABEL[l.statusConciliacao] ?? l.statusConciliacao}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })
                 )}
               </tbody>
             </table>
           </div>
 
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-500">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-500 dark:text-slate-400">
               Mostrando até {filtros.pageSize} por página
             </span>
             <div className="flex gap-2">
-              {filtros.page > 1 && (
-                <Link href={linkPagina(filtros.page - 1)} className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100">
+              {filtros.page > 1 ? (
+                <Link 
+                  href={linkPagina(filtros.page - 1)} 
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                >
+                  <ChevronLeft className="h-4 w-4" />
                   Anterior
                 </Link>
+              ) : (
+                <button
+                  disabled
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-300 cursor-not-allowed dark:border-slate-800 dark:bg-slate-900 dark:text-slate-600"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </button>
               )}
-              {filtros.page < totalPaginas && (
-                <Link href={linkPagina(filtros.page + 1)} className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100">
+              {filtros.page < totalPaginas ? (
+                <Link 
+                  href={linkPagina(filtros.page + 1)} 
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                >
                   Próxima
+                  <ChevronRight className="h-4 w-4" />
                 </Link>
+              ) : (
+                <button
+                  disabled
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-300 cursor-not-allowed dark:border-slate-800 dark:bg-slate-900 dark:text-slate-600"
+                >
+                  Próxima
+                  <ChevronRight className="h-4 w-4" />
+                </button>
               )}
             </div>
           </div>
