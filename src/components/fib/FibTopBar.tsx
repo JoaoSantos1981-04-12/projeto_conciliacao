@@ -14,6 +14,7 @@ import {
   Home,
 } from 'lucide-react'
 import { useFibContext } from '@/lib/fib/context'
+import { exportarDashboardPdf, exportarKpisExcel } from '@/lib/fib/export'
 
 const abas = [
   { label: 'Geral', href: '/fib/geral', icon: Home },
@@ -41,16 +42,36 @@ export function FibTopBar() {
     periodoSelecionado,
     definirPeriodo,
     carregandoImportacoes,
+    dados,
   } = useFibContext()
 
-  const exportarPDF = () => {
-    // TODO: exportação PDF (Fase 2)
-    console.log('Exportando PDF...')
+  const [exportando, setExportando] = React.useState<null | 'pdf' | 'excel'>(
+    null
+  )
+
+  const exportarPDF = async () => {
+    const elemento = document.getElementById('fib-export-root')
+    if (!elemento) return
+    setExportando('pdf')
+    try {
+      await exportarDashboardPdf(elemento, importacaoAtual?.empresa)
+    } catch (err) {
+      console.error('Erro ao exportar PDF:', err)
+    } finally {
+      setExportando(null)
+    }
   }
 
-  const exportarExcel = () => {
-    // TODO: exportação Excel (Fase 2)
-    console.log('Exportando Excel...')
+  const exportarExcel = async () => {
+    if (!dados) return
+    setExportando('excel')
+    try {
+      await exportarKpisExcel(dados, importacaoAtual?.empresa)
+    } catch (err) {
+      console.error('Erro ao exportar Excel:', err)
+    } finally {
+      setExportando(null)
+    }
   }
 
   return (
@@ -124,20 +145,24 @@ export function FibTopBar() {
           <div className="flex items-center gap-2">
             <button
               onClick={exportarPDF}
+              disabled={exportando !== null || !dados}
               className="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700
-                flex items-center gap-2 text-sm transition-colors"
+                flex items-center gap-2 text-sm transition-colors disabled:opacity-50
+                disabled:cursor-not-allowed"
             >
               <Download className="w-4 h-4" />
-              PDF
+              {exportando === 'pdf' ? 'Gerando…' : 'PDF'}
             </button>
 
             <button
               onClick={exportarExcel}
+              disabled={exportando !== null || !dados}
               className="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700
-                flex items-center gap-2 text-sm transition-colors"
+                flex items-center gap-2 text-sm transition-colors disabled:opacity-50
+                disabled:cursor-not-allowed"
             >
               <FileJson className="w-4 h-4" />
-              Excel
+              {exportando === 'excel' ? 'Gerando…' : 'Excel'}
             </button>
           </div>
         </div>

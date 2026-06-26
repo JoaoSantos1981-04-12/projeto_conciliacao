@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { Sparkles, Send, RefreshCw } from 'lucide-react'
 import { useFibContext } from '@/lib/fib/context'
+import { useFibEstado } from '@/components/fib/FibGate'
 
 interface Mensagem {
   tipo: 'usuario' | 'ia'
@@ -11,7 +12,8 @@ interface Mensagem {
 }
 
 export default function FibIaPage() {
-  const { dados, carregando, erro } = useFibContext()
+  const { dados } = useFibContext()
+  const estado = useFibEstado()
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
   const [gerando, setGerando] = useState(false)
   const [insightGerado, setInsightGerado] = useState(false)
@@ -56,29 +58,8 @@ export default function FibIaPage() {
     }
   }
 
-  if (carregando) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-slate-400">Carregando dados...</div>
-      </div>
-    )
-  }
-
-  if (erro) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-red-400">{erro}</div>
-      </div>
-    )
-  }
-
-  if (!dados) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-slate-400">Nenhum dado disponível</div>
-      </div>
-    )
-  }
+  if (estado) return <>{estado}</>
+  if (!dados) return null // já coberto por `estado`; narrow para o TS
 
   return (
     <div className="flex flex-col h-[calc(100vh-200px)] gap-6">

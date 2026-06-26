@@ -4,6 +4,7 @@ import {
   FibContaAgregada,
   ContaClassificacao,
   FibAlerta,
+  FibSerieMensalPonto,
 } from '@/lib/types/fib'
 
 /**
@@ -202,6 +203,55 @@ export function agregarContas(
   }
 
   return porClasse
+}
+
+/**
+ * Agrupa os lançamentos por mês (competência) e agrega por classe, gerando a
+ * série temporal usada nos gráficos de crescimento (CEO/CFO).
+ *
+ * ⚠️ Herda a mesma agregação pendente de validação contábil (soma de `saldo`)
+ * descrita em `agregasPorConta`. Substitui os dados antes MOCKADOS por valores
+ * derivados dos lançamentos reais; quando a regra de agregação for confirmada,
+ * basta ajustar aqui também.
+ */
+export function calcularSerieMensal(
+  lancamentos: LancamentoComConta[]
+): FibSerieMensalPonto[] {
+  const porMes = new Map<
+    string,
+    { receitas: number; despesas: number; ativo: number; ordem: number }
+  >()
+
+  for (const l of lancamentos) {
+    const d = new Date(l.dataLancamento)
+    const ano = d.getFullYear()
+    const mes = d.getMonth() // 0-11
+    const chave = `${String(mes + 1).padStart(2, '0')}/${ano}`
+    const ordem = ano * 12 + mes
+
+    if (!porMes.has(chave)) {
+      porMes.set(chave, { receitas: 0, despesas: 0, ativo: 0, ordem })
+    }
+    const ponto = porMes.get(chave)!
+    const classe = classificarConta(l.contaContabil.codigo)
+    const valor = Number(l.saldo)
+
+    if (classe === ContaClassificacao.RECEITA) ponto.receitas += valor
+    else if (classe === ContaClassificacao.DESPESA) ponto.despesas += valor
+    else if (classe === ContaClassificacao.ATIVO) ponto.ativo += valor
+  }
+
+  return Array.from(porMes.entries())
+    .map(([mes, v]) => ({
+      mes,
+      receitas: v.receitas,
+      despesas: v.despesas,
+      lucro: v.receitas - v.despesas,
+      ativo: v.ativo,
+      ordem: v.ordem,
+    }))
+    .sort((a, b) => a.ordem - b.ordem)
+    .map(({ ordem: _ordem, ...resto }) => resto)
 }
 
 /**

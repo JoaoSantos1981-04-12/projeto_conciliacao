@@ -49,9 +49,18 @@ export interface FibContaAgregada {
   percentualDaClasse: number
 }
 
+export interface FibSerieMensalPonto {
+  mes: string // "MM/AAAA"
+  receitas: number
+  despesas: number
+  lucro: number
+  ativo: number
+}
+
 export interface FibDashboardData {
   kpis: FibKpi
   contasPorClassificacao: Record<ContaClassificacao, FibContaAgregada[]>
+  serieMensal: FibSerieMensalPonto[]
   alertas: FibAlerta[]
   cacheTimestamp: Date
 }

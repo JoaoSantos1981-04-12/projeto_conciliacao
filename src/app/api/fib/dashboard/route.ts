@@ -5,9 +5,14 @@ import { prisma } from '@/lib/db/prisma'
 import {
   calcularKpis,
   agregarContas,
+  calcularSerieMensal,
   gerarAlertas,
 } from '@/lib/fib/kpi-service'
 import { FibDashboardData } from '@/lib/types/fib'
+import { chaveCache, lerCache, gravarCache } from '@/lib/fib/cache'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
   try {
@@ -31,6 +36,18 @@ export async function GET(req: NextRequest) {
         { erro: 'importacaoId é obrigatório' },
         { status: 400 }
       )
+    }
+
+    // Cache em memória (importação + período); evita recalcular a cada request.
+    const chave = chaveCache(importacaoId, periodoInicio, periodoFim)
+    const cacheHit = lerCache(chave)
+    if (cacheHit) {
+      return NextResponse.json(cacheHit, {
+        headers: {
+          'Cache-Control': 'public, max-age=300',
+          'X-Fib-Cache': 'HIT',
+        },
+      })
     }
 
     // Buscar importação
@@ -74,19 +91,26 @@ export async function GET(req: NextRequest) {
     // Agregar contas por classificação
     const contasPorClassificacao = agregarContas(importacao.lancamentos)
 
+    // Série temporal (mês a mês) para os gráficos de crescimento
+    const serieMensal = calcularSerieMensal(importacao.lancamentos)
+
     // Gerar alertas
     const alertas = gerarAlertas(kpis)
 
     const dados: FibDashboardData = {
       kpis,
       contasPorClassificacao,
+      serieMensal,
       alertas,
       cacheTimestamp: new Date(),
     }
 
+    gravarCache(chave, dados)
+
     return NextResponse.json(dados, {
       headers: {
         'Cache-Control': 'public, max-age=300', // Cache por 5 minutos
+        'X-Fib-Cache': 'MISS',
       },
     })
   } catch (erro) {

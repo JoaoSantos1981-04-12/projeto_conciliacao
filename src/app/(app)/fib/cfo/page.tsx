@@ -14,35 +14,14 @@ import {
 } from 'recharts'
 import { AlertCircle, CheckCircle } from 'lucide-react'
 import { useFibContext } from '@/lib/fib/context'
+import { useFibEstado } from '@/components/fib/FibGate'
 
 export default function FibCfoPage() {
-  const { dados, carregando, erro } = useFibContext()
+  const { dados } = useFibContext()
+  const estado = useFibEstado()
+  if (estado) return <>{estado}</>
 
-  if (carregando) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-slate-400">Carregando dados...</div>
-      </div>
-    )
-  }
-
-  if (erro) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-red-400">{erro}</div>
-      </div>
-    )
-  }
-
-  if (!dados) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-slate-400">Nenhum dado disponível</div>
-      </div>
-    )
-  }
-
-  const { kpis } = dados
+  const { kpis } = dados!
 
   // Estrutura simplificada de DRE (Demonstração de Resultado do Exercício)
   const dadosDRE = [

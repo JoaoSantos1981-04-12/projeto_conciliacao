@@ -1,149 +1,100 @@
 'use client'
 
 import React from 'react'
-import { AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Inbox } from 'lucide-react'
 import { useFibContext } from '@/lib/fib/context'
+import { useFibEstado } from '@/components/fib/FibGate'
 import { ContaClassificacao } from '@/lib/types/fib'
 
-export default function FibFiscalPage() {
-  const { dados, carregando, erro } = useFibContext()
+type NivelRisco = 'ALTO' | 'MEDIO' | 'BAIXO'
 
-  if (carregando) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-slate-400">Carregando dados...</div>
-      </div>
-    )
+/**
+ * Classifica o risco de uma conta fiscal pelo peso relativo no total de
+ * passivos fiscais. Heurística transparente baseada em dados reais — o razão
+ * não traz datas de vencimento, então não fabricamos prazos.
+ */
+function nivelPorPeso(percentual: number): NivelRisco {
+  if (percentual >= 40) return 'ALTO'
+  if (percentual >= 20) return 'MEDIO'
+  return 'BAIXO'
+}
+
+function corRisco(risco: NivelRisco): string {
+  switch (risco) {
+    case 'ALTO':
+      return 'bg-orange-500/20 border-orange-500/30 text-orange-400'
+    case 'MEDIO':
+      return 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400'
+    case 'BAIXO':
+      return 'bg-green-500/20 border-green-500/30 text-green-400'
   }
+}
 
-  if (erro) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-red-400">{erro}</div>
-      </div>
-    )
-  }
-
-  if (!dados) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-slate-400">Nenhum dado disponível</div>
-      </div>
-    )
-  }
-
-  const { contasPorClassificacao, kpis } = dados
-
-  // Extrair contas fiscais (Passivos que começam com 2.1 e 2.2)
-  const passivos = contasPorClassificacao[ContaClassificacao.PASSIVO] || []
-  const contasFiscais = passivos.filter((c) =>
-    c.codigo.match(/^2\.1|^2\.2/) // Contas de curto prazo ou fiscal
+function iconeRisco(risco: NivelRisco) {
+  return risco === 'ALTO' ? (
+    <AlertTriangle className="w-5 h-5" />
+  ) : (
+    <CheckCircle2 className="w-5 h-5" />
   )
+}
 
-  const totalPassivoFiscal = contasFiscais.reduce((sum, c) => sum + c.saldo, 0)
-  const percentualPassivoFiscal = kpis.passivoTotal > 0
-    ? (totalPassivoFiscal / kpis.passivoTotal) * 100
-    : 0
+export default function FibFiscalPage() {
+  const { dados } = useFibContext()
+  const estado = useFibEstado()
+  if (estado) return <>{estado}</>
 
-  // Simulação de obrigações fiscais comuns
-  const obrigacoesFiscais = [
-    {
-      nome: 'ICMS a Recolher',
-      valor: totalPassivoFiscal * 0.3,
-      vencimento: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
-      periodicidade: 'Mensal',
-      risco: 'MEDIO',
-    },
-    {
-      nome: 'IRPJ/CSLL a Recolher',
-      valor: totalPassivoFiscal * 0.25,
-      vencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      periodicidade: 'Trimestral',
-      risco: 'BAIXO',
-    },
-    {
-      nome: 'PIS/COFINS a Recolher',
-      valor: totalPassivoFiscal * 0.2,
-      vencimento: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000),
-      periodicidade: 'Mensal',
-      risco: 'ALTO',
-    },
-    {
-      nome: 'ISS a Recolher',
-      valor: totalPassivoFiscal * 0.15,
-      vencimento: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
-      periodicidade: 'Mensal',
-      risco: 'CRITICO',
-    },
-    {
-      nome: 'Contribuições Sociais',
-      valor: totalPassivoFiscal * 0.1,
-      vencimento: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000),
-      periodicidade: 'Mensal',
-      risco: 'MEDIO',
-    },
-  ]
+  const { contasPorClassificacao, kpis } = dados!
 
-  const getCor = (risco: string) => {
-    switch (risco) {
-      case 'CRITICO':
-        return 'bg-red-500/20 border-red-500/30 text-red-400'
-      case 'ALTO':
-        return 'bg-orange-500/20 border-orange-500/30 text-orange-400'
-      case 'MEDIO':
-        return 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400'
-      case 'BAIXO':
-        return 'bg-green-500/20 border-green-500/30 text-green-400'
-      default:
-        return 'bg-slate-500/20 border-slate-500/30 text-slate-400'
-    }
-  }
+  // Contas fiscais reais = passivos cujo código começa em 2.1 ou 2.2.
+  const passivos = contasPorClassificacao[ContaClassificacao.PASSIVO] || []
+  const contasFiscais = passivos.filter((c) => /^2\.[12]/.test(c.codigo))
 
-  const getIcone = (risco: string) => {
-    switch (risco) {
-      case 'CRITICO':
-      case 'ALTO':
-        return <AlertTriangle className="w-5 h-5" />
-      default:
-        return <CheckCircle2 className="w-5 h-5" />
-    }
-  }
+  const totalPassivoFiscal = contasFiscais.reduce((s, c) => s + c.saldo, 0)
+  const percentualPassivoFiscal =
+    kpis.passivoTotal > 0
+      ? (totalPassivoFiscal / kpis.passivoTotal) * 100
+      : 0
+
+  // Atribui o nível de risco por peso relativo no total fiscal.
+  const itensFiscais = contasFiscais.map((c) => {
+    const peso =
+      totalPassivoFiscal !== 0
+        ? (Math.abs(c.saldo) / Math.abs(totalPassivoFiscal)) * 100
+        : 0
+    return { conta: c, peso, risco: nivelPorPeso(peso) }
+  })
+
+  const contar = (r: NivelRisco) =>
+    itensFiscais.filter((i) => i.risco === r).length
 
   return (
     <div className="space-y-6">
       {/* Resumo Fiscal */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-6 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900
-          border border-slate-700/50">
+        <div className="p-6 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50">
           <p className="text-slate-400 text-sm">Total de Passivos Fiscais</p>
           <p className="text-2xl font-bold text-orange-400 mt-2">
-            R$ {totalPassivoFiscal.toLocaleString('pt-BR', {
-              minimumFractionDigits: 2,
-            })}
+            R$ {totalPassivoFiscal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </p>
           <p className="text-xs text-slate-500 mt-2">
             {percentualPassivoFiscal.toFixed(1)}% do passivo total
           </p>
         </div>
 
-        <div className="p-6 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900
-          border border-slate-700/50">
-          <p className="text-slate-400 text-sm">Obrigações Vencendo</p>
-          <p className="text-2xl font-bold text-red-400 mt-2">
-            {obrigacoesFiscais.filter(
-              (o) => o.vencimento < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-            ).length}
+        <div className="p-6 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50">
+          <p className="text-slate-400 text-sm">Contas Fiscais Identificadas</p>
+          <p className="text-2xl font-bold text-blue-400 mt-2">
+            {contasFiscais.length}
           </p>
-          <p className="text-xs text-slate-500 mt-2">próximos 30 dias</p>
+          <p className="text-xs text-slate-500 mt-2">códigos 2.1.x / 2.2.x</p>
         </div>
 
-        <div className="p-6 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900
-          border border-slate-700/50">
-          <p className="text-slate-400 text-sm">Conformidade Fiscal</p>
-          <p className="text-2xl font-bold text-emerald-400 mt-2">
-            {kpis.ativoTotal > 0 ? '✓' : '✗'}
+        <div className="p-6 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50">
+          <p className="text-slate-400 text-sm">Risco Alto</p>
+          <p className="text-2xl font-bold text-orange-400 mt-2">
+            {contar('ALTO')}
           </p>
-          <p className="text-xs text-slate-500 mt-2">Status: Sob Monitoramento</p>
+          <p className="text-xs text-slate-500 mt-2">≥ 40% do passivo fiscal</p>
         </div>
       </div>
 
@@ -153,52 +104,54 @@ export default function FibFiscalPage() {
         <div>
           <p className="font-semibold text-yellow-400">Aviso de Conformidade</p>
           <p className="text-sm text-slate-300 mt-1">
-            Este dashboard é informativo e não substitui análise fiscal profissional. Consulte o contador ou assessor fiscal para validação de valores e cumprimento de obrigações.
+            Este dashboard é informativo e não substitui análise fiscal
+            profissional. O razão não fornece datas de vencimento — o risco
+            abaixo reflete apenas o peso de cada conta. Consulte o contador para
+            validar valores e prazos.
           </p>
         </div>
       </div>
 
-      {/* Obrigações Fiscais */}
+      {/* Contas Fiscais */}
       <div>
-        <h2 className="text-xl font-bold text-white mb-4">Obrigações Fiscais Projetadas</h2>
-        <div className="space-y-3">
-          {obrigacoesFiscais
-            .sort((a, b) => a.vencimento.getTime() - b.vencimento.getTime())
-            .map((obrigacao, idx) => {
-              const diasParaVencimento = Math.ceil(
-                (obrigacao.vencimento.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-              )
-              const vencida = diasParaVencimento < 0
-              const proximoVencimento = diasParaVencimento >= 0 && diasParaVencimento <= 7
-
-              return (
+        <h2 className="text-xl font-bold text-white mb-4">Passivos Fiscais</h2>
+        {itensFiscais.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-40 gap-3 text-center
+            rounded-lg bg-slate-800/40 border border-slate-700/50">
+            <Inbox className="w-8 h-8 text-slate-500" />
+            <p className="text-slate-400 max-w-md">
+              Nenhuma conta de passivo fiscal (códigos 2.1.x / 2.2.x) foi
+              identificada nesta importação.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {itensFiscais
+              .sort((a, b) => Math.abs(b.conta.saldo) - Math.abs(a.conta.saldo))
+              .map(({ conta, peso, risco }) => (
                 <div
-                  key={idx}
-                  className={`p-4 rounded-lg border ${getCor(
-                    vencida ? 'CRITICO' : proximoVencimento ? 'ALTO' : obrigacao.risco
-                  )}`}
+                  key={conta.codigo}
+                  className={`p-4 rounded-lg border ${corRisco(risco)}`}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3 flex-1">
-                      {getIcone(
-                        vencida ? 'CRITICO' : proximoVencimento ? 'ALTO' : obrigacao.risco
-                      )}
+                      {iconeRisco(risco)}
                       <div>
-                        <p className="font-semibold">{obrigacao.nome}</p>
-                        <div className="flex gap-4 text-sm mt-2 text-slate-400">
-                          <span>Periodicidade: {obrigacao.periodicidade}</span>
-                          <span>Vencimento: {obrigacao.vencimento.toLocaleDateString('pt-BR')}</span>
-                          <span className={vencida ? 'text-red-400' : ''}>
-                            {vencida
-                              ? `✗ Vencida há ${Math.abs(diasParaVencimento)} dias`
-                              : `${diasParaVencimento} dias`}
-                          </span>
+                        <div className="flex items-center gap-2">
+                          <code className="text-sm font-mono opacity-80">
+                            {conta.codigo}
+                          </code>
+                          <p className="font-semibold">{conta.nome}</p>
+                        </div>
+                        <div className="flex gap-4 text-sm mt-2 opacity-80">
+                          <span>Risco: {risco}</span>
+                          <span>{peso.toFixed(1)}% do passivo fiscal</span>
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold">
-                        R$ {obrigacao.valor.toLocaleString('pt-BR', {
+                        R$ {conta.saldo.toLocaleString('pt-BR', {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
@@ -206,14 +159,13 @@ export default function FibFiscalPage() {
                     </div>
                   </div>
                 </div>
-              )
-            })}
-        </div>
+              ))}
+          </div>
+        )}
       </div>
 
       {/* Recomendações Fiscais */}
-      <div className="p-6 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900
-        border border-slate-700/50">
+      <div className="p-6 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50">
         <h3 className="font-semibold text-white mb-4">Recomendações Fiscais</h3>
         <ul className="space-y-2 text-sm text-slate-200">
           <li>📋 Validar provisões fiscais com o contador responsável</li>
@@ -225,34 +177,21 @@ export default function FibFiscalPage() {
         </ul>
       </div>
 
-      {/* Matriz de Risco Fiscal */}
-      <div className="p-6 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900
-        border border-slate-700/50">
-        <h3 className="font-semibold text-white mb-4">Análise de Risco Fiscal</h3>
-        <div className="grid grid-cols-2 gap-4 text-center">
-          <div className="p-4 rounded bg-red-500/10 border border-red-500/30">
-            <p className="text-red-400 text-2xl font-bold">
-              {obrigacoesFiscais.filter((o) => o.risco === 'CRITICO').length}
-            </p>
-            <p className="text-sm text-slate-400">Críticas</p>
-          </div>
+      {/* Distribuição de Risco */}
+      <div className="p-6 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50">
+        <h3 className="font-semibold text-white mb-4">Distribuição de Risco (por peso)</h3>
+        <div className="grid grid-cols-3 gap-4 text-center">
           <div className="p-4 rounded bg-orange-500/10 border border-orange-500/30">
-            <p className="text-orange-400 text-2xl font-bold">
-              {obrigacoesFiscais.filter((o) => o.risco === 'ALTO').length}
-            </p>
-            <p className="text-sm text-slate-400">Altas</p>
+            <p className="text-orange-400 text-2xl font-bold">{contar('ALTO')}</p>
+            <p className="text-sm text-slate-400">Alto</p>
           </div>
           <div className="p-4 rounded bg-yellow-500/10 border border-yellow-500/30">
-            <p className="text-yellow-400 text-2xl font-bold">
-              {obrigacoesFiscais.filter((o) => o.risco === 'MEDIO').length}
-            </p>
-            <p className="text-sm text-slate-400">Médias</p>
+            <p className="text-yellow-400 text-2xl font-bold">{contar('MEDIO')}</p>
+            <p className="text-sm text-slate-400">Médio</p>
           </div>
           <div className="p-4 rounded bg-green-500/10 border border-green-500/30">
-            <p className="text-green-400 text-2xl font-bold">
-              {obrigacoesFiscais.filter((o) => o.risco === 'BAIXO').length}
-            </p>
-            <p className="text-sm text-slate-400">Baixas</p>
+            <p className="text-green-400 text-2xl font-bold">{contar('BAIXO')}</p>
+            <p className="text-sm text-slate-400">Baixo</p>
           </div>
         </div>
       </div>

@@ -6,6 +6,9 @@ import { FibDashboardData } from '@/lib/types/fib'
 const GEMINI_API_KEY = process.env.GOOGLE_API_KEY
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: NextRequest) {
   try {
     // Verificar autenticação

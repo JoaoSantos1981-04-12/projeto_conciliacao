@@ -15,44 +15,21 @@ import {
 } from 'recharts'
 import { TrendingUp, TrendingDown, Percent } from 'lucide-react'
 import { useFibContext } from '@/lib/fib/context'
+import { useFibEstado } from '@/components/fib/FibGate'
 
 export default function FibCeoPage() {
-  const { dados, carregando, erro } = useFibContext()
+  const { dados } = useFibContext()
+  const estado = useFibEstado()
+  if (estado) return <>{estado}</>
 
-  if (carregando) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-slate-400">Carregando dados...</div>
-      </div>
-    )
-  }
+  const { kpis, serieMensal } = dados!
 
-  if (erro) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-red-400">{erro}</div>
-      </div>
-    )
-  }
-
-  if (!dados) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-slate-400">Nenhum dado disponível</div>
-      </div>
-    )
-  }
-
-  const { kpis } = dados
-
-  // Dados simulados de crescimento (em produção, virão do banco)
-  const dadosCrescimento = [
-    { mes: 'Jan', receita: 100000, lucro: 15000 },
-    { mes: 'Fev', receita: 105000, lucro: 16000 },
-    { mes: 'Mar', receita: 112000, lucro: 18000 },
-    { mes: 'Abr', receita: 118000, lucro: 19500 },
-    { mes: 'Mai', receita: kpis.totalReceitas, lucro: kpis.lucroLiquido },
-  ]
+  // Série de crescimento real, derivada dos lançamentos (mês a mês).
+  const dadosCrescimento = serieMensal.map((p) => ({
+    mes: p.mes,
+    receita: p.receitas,
+    lucro: p.lucro,
+  }))
 
   return (
     <div className="space-y-6">
