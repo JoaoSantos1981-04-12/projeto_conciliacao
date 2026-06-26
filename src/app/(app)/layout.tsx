@@ -9,6 +9,7 @@ const navItens = [
   { href: '/conciliacao', label: 'Conciliação' },
   { href: '/comparacao', label: 'Comparação' },
   { href: '/relatorios', label: 'Relatórios' },
+  { href: '/fib/geral', label: 'Inteligência Financeira' },
 ]
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {

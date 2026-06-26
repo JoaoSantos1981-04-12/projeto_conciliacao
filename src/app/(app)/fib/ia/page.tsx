@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Sparkles, Send, RefreshCw } from 'lucide-react'
+import { Sparkles, RefreshCw } from 'lucide-react'
 import { useFibContext } from '@/lib/fib/context'
 import { useFibEstado } from '@/components/fib/FibGate'
 

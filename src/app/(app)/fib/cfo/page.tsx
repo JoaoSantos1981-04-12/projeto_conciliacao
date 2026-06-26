@@ -9,8 +9,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  ScatterChart,
-  Scatter,
 } from 'recharts'
 import { AlertCircle, CheckCircle } from 'lucide-react'
 import { useFibContext } from '@/lib/fib/context'
