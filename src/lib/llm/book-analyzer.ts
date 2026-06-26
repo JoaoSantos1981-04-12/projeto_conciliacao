@@ -23,6 +23,18 @@ import {
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages'
 const MODEL = 'claude-sonnet-4-6'
 
+// Provedor de LLM configurável (§10 usa Anthropic por padrão). Gemini é uma
+// alternativa ativada via LLM_PROVIDER=gemini — útil quando a conta Anthropic
+// está sem créditos. O contrato de saída (AnaliseLlm §10.3) é o mesmo.
+const GEMINI_URL = (model: string): string =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+
+function provedorAtivo(): 'anthropic' | 'gemini' {
+  return (process.env.LLM_PROVIDER ?? 'anthropic').toLowerCase() === 'gemini'
+    ? 'gemini'
+    : 'anthropic'
+}
+
 const SYSTEM_PROMPT_CONTADOR = `Você é um Contador Sênior especialista em conciliação contábil e auditoria, analisando uma divergência de amarração de saldos (Balancete = Razão = Σ relatório em aberto) de uma conta patrimonial.
 
 Analise os dados recebidos e responda com linguagem técnica e executiva, em português brasileiro.
@@ -92,6 +104,27 @@ function extrairTextoResposta(data: unknown): string {
   return texto
 }
 
+function extrairTextoGemini(data: unknown): string {
+  if (typeof data !== 'object' || data === null) {
+    throw new Error('Resposta da Gemini API sem corpo de objeto.')
+  }
+  const candidates = (data as { candidates?: unknown }).candidates
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    const err = (data as { error?: { message?: string } }).error
+    throw new Error(`Resposta da Gemini API sem candidates. ${err?.message ?? ''}`.trim())
+  }
+  const parts = (candidates[0] as { content?: { parts?: unknown } })?.content?.parts
+  const primeiro = Array.isArray(parts) ? parts[0] : undefined
+  const texto =
+    typeof primeiro === 'object' && primeiro !== null
+      ? (primeiro as { text?: unknown }).text
+      : undefined
+  if (typeof texto !== 'string') {
+    throw new Error('Resposta da Gemini API sem texto na parte de conteúdo.')
+  }
+  return texto
+}
+
 function coagir<T extends string>(
   valor: unknown,
   permitidos: readonly T[],
@@ -123,10 +156,19 @@ function parseAnalise(texto: string): AnaliseLlm {
 }
 
 /**
- * Chama a Claude API e retorna a análise estruturada (§10.3).
- * Lança erro se a chave estiver ausente ou a API responder com falha.
+ * Analisa uma ficha via LLM e retorna a estrutura §10.3.
+ * Despacha para Anthropic (padrão) ou Gemini conforme LLM_PROVIDER.
  */
 export async function analisarFicha(payload: PayloadAnaliseFicha): Promise<AnaliseLlm> {
+  const texto =
+    provedorAtivo() === 'gemini'
+      ? await chamarGemini(payload)
+      : await chamarAnthropic(payload)
+  return parseAnalise(texto)
+}
+
+/** Claude API (§10.1): headers x-api-key + anthropic-version; max_tokens 2000. */
+async function chamarAnthropic(payload: PayloadAnaliseFicha): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     throw new Error('ANTHROPIC_API_KEY ausente — configure no .env.')
@@ -154,5 +196,42 @@ export async function analisarFicha(payload: PayloadAnaliseFicha): Promise<Anali
   }
 
   const data: unknown = await res.json()
-  return parseAnalise(extrairTextoResposta(data))
+  return extrairTextoResposta(data)
+}
+
+/** Gemini API (generateContent): chave no header x-goog-api-key; JSON na saída. */
+async function chamarGemini(payload: PayloadAnaliseFicha): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY ausente — configure no .env.')
+  }
+  const model = process.env.GEMINI_MODEL ?? 'gemini-2.0-flash'
+
+  const res = await fetch(GEMINI_URL(model), {
+    method: 'POST',
+    headers: {
+      'x-goog-api-key': apiKey,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: SYSTEM_PROMPT_CONTADOR }] },
+      contents: [{ role: 'user', parts: [{ text: JSON.stringify(payload) }] }],
+      generationConfig: {
+        temperature: 0,
+        maxOutputTokens: 2000,
+        responseMimeType: 'application/json',
+        // Modelos Gemini 2.5 são "thinking": os tokens de raciocínio consomem
+        // maxOutputTokens e truncam o JSON. Desligamos para saída estruturada.
+        thinkingConfig: { thinkingBudget: 0 },
+      },
+    }),
+  })
+
+  if (!res.ok) {
+    const corpo = await res.text().catch(() => '')
+    throw new Error(`Gemini API retornou ${res.status}: ${corpo.slice(0, 200)}`)
+  }
+
+  const data: unknown = await res.json()
+  return extrairTextoGemini(data)
 }

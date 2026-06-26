@@ -1,5 +1,5 @@
 import pdf from 'pdf-parse/lib/pdf-parse.js'
-import { parseMoney } from './pdf-utils'
+import { parseMoney, parseDataBR } from './pdf-utils'
 import { detectarTipoRelatorio, detectarCodigoConta } from './pdf-router'
 import {
   RelatorioParseResult,
@@ -78,6 +78,59 @@ function extrairItensExtrato(text: string): ItemRelatorioParsed[] {
   return itens
 }
 
+/**
+ * Títulos em aberto do CR (NSQ2208d). Cada título:
+ *   <doc(9)>-<favorecido…> <vcto><emissão> <juros>[<dias>] <Val.Aberto> …
+ * O "dias de atraso" pode vir colado ao juros nos títulos a vencer (ex.: "0,00-20").
+ * Val.Aberto = 1º valor após o campo de dias. Σ ≈ total impresso (validado).
+ */
+function extrairItensCR(text: string): ItemRelatorioParsed[] {
+  const re =
+    /(\d{9})-([\s\S]*?)(\d{2}\/\d{2}\/\d{4})(\d{2}\/\d{2}\/\d{4})\s+[\d.]+,\d{2}\s*(-?\d+)\s+([\d.]+,\d{2})/g
+  const itens: ItemRelatorioParsed[] = []
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    itens.push({
+      tipo: 'TITULO_ABERTO',
+      documento: m[1],
+      nome: m[2].replace(/\s+/g, ' ').trim(),
+      dataVencimento: parseDataBR(m[3]) ?? undefined,
+      dataEmissao: parseDataBR(m[4]) ?? undefined,
+      diasAtraso: Number(m[5]),
+      valorAberto: parseMoney(m[6]),
+    })
+  }
+  return itens
+}
+
+/**
+ * Títulos do CP (NSQ2109ac), agrupado por favorecido. Âncora na linha de datas
+ * "<vcto><emissão>"; a linha anterior traz os valores e o 1º é o Val. Aberto do
+ * título (vencido + a vencer). Σ = total impresso (validado, dif. R$ 0,00).
+ * O favorecido vem na linha seguinte.
+ */
+function extrairItensCP(text: string): ItemRelatorioParsed[] {
+  const linhas = text.split('\n')
+  const itens: ItemRelatorioParsed[] = []
+  for (let i = 1; i < linhas.length; i++) {
+    const dm = linhas[i].match(/^(\d{2}\/\d{2}\/\d{4})(\d{2}\/\d{2}\/\d{4})$/)
+    if (!dm) continue
+    const moneys = (linhas[i - 1].match(/[\d.]+,\d{2}/g) ?? []).map(parseMoney)
+    if (moneys.length < 1) continue
+    const valorAberto = moneys[0] // Val. Aberto (vencido + a vencer do título)
+    if (valorAberto <= 0) continue // ignora títulos sem saldo em aberto
+    const nome = (linhas[i + 1] ?? '').trim()
+    itens.push({
+      tipo: 'TITULO_ABERTO',
+      nome: nome.slice(0, 120),
+      dataVencimento: parseDataBR(dm[1]) ?? undefined,
+      dataEmissao: parseDataBR(dm[2]) ?? undefined,
+      valorAberto,
+    })
+  }
+  return itens
+}
+
 export async function parseRelatorioSuporte(buffer: Buffer): Promise<RelatorioParseResult> {
   const { text } = await pdf(buffer)
   return parseRelatorioSuporteTexto(text)
@@ -90,8 +143,10 @@ export function parseRelatorioSuporteTexto(text: string): RelatorioParseResult {
   const codigoConta = detectarCodigoConta(text, tipoRelatorio)
   const total = extrairTotal(text, tipoRelatorio)
 
-  const itens =
-    tipoRelatorio === 'EXTRATO_BANCARIO' ? extrairItensExtrato(text) : []
+  let itens: ItemRelatorioParsed[] = []
+  if (tipoRelatorio === 'EXTRATO_BANCARIO') itens = extrairItensExtrato(text)
+  else if (tipoRelatorio === 'CR_ABERTO') itens = extrairItensCR(text)
+  else if (tipoRelatorio === 'CP_ABERTO') itens = extrairItensCP(text)
 
   if (total === null) {
     erros.push({

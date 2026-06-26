@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db/prisma'
+import { Plus, BookOpen, ChevronRight, FileText, AlertTriangle, Calendar, User } from 'lucide-react'
 
 export const metadata = { title: 'Book Digital · Conciliação Contábil' }
 export const dynamic = 'force-dynamic'
@@ -29,38 +30,42 @@ export default async function BookListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Book Digital</h1>
-          <p className="mt-1 text-sm text-slate-600">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Book Digital</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             Fichas de conciliação por conta, a partir dos PDFs do razão e relatórios de suporte.
           </p>
         </div>
         <Link
           href="/book/novo"
-          className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700 active:translate-y-px"
+          className="inline-flex items-center gap-2 rounded-lg bg-emeraldBlue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emeraldBlue-700 transition active:translate-y-px dark:bg-emeraldBlue-600 dark:hover:bg-emeraldBlue-500"
         >
-          Novo book
+          <Plus className="h-4 w-4" />
+          Novo Book
         </Link>
       </div>
 
       {erroDb ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          Não foi possível consultar o banco. Verifique o PostgreSQL e as migrations
-          (<code>npx prisma migrate deploy</code>).
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/30 dark:bg-amber-950/20">
+          <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <div className="text-sm text-amber-800 dark:text-amber-300">
+            Não foi possível consultar o banco de dados. Verifique o PostgreSQL e as migrations.
+          </div>
         </div>
       ) : books && books.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-12 text-center">
-          <h2 className="text-base font-semibold text-slate-800">Nenhum book ainda</h2>
-          <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-            Crie o primeiro book do mês para começar a enviar os PDFs do razão e dos relatórios de
-            suporte.
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-900 transition-colors">
+          <BookOpen className="mx-auto h-12 w-12 text-slate-400 dark:text-slate-600 mb-4" />
+          <h2 className="text-base font-semibold text-slate-900 dark:text-white">Nenhum book gerado</h2>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500 dark:text-slate-400">
+            Crie o primeiro book do mês para começar a anexar os PDFs do razão e dos relatórios de suporte.
           </p>
           <Link
             href="/book/novo"
-            className="mt-4 inline-block rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700 active:translate-y-px"
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-emeraldBlue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emeraldBlue-700 transition active:translate-y-px"
           >
-            Criar book
+            Criar Book
+            <ChevronRight className="h-4 w-4" />
           </Link>
         </div>
       ) : (
@@ -69,22 +74,32 @@ export default async function BookListPage() {
             <Link
               key={b.id}
               href={`/book/${b.id}`}
-              className="block rounded-lg border border-slate-200 bg-white p-5 transition hover:border-brand hover:shadow-sm"
+              className="block rounded-xl border border-slate-200/60 bg-white p-5 shadow-sm hover:border-emeraldBlue-500 hover:shadow-md dark:border-slate-850 dark:bg-slate-900 transition-all group"
             >
-              <p className="text-xs uppercase tracking-wide text-slate-400">
-                {MES_LABEL[b.mes]} / {b.ano}
-              </p>
-              <h3 className="mt-1 truncate font-semibold text-slate-900" title={b.empresaId}>
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-1.5 rounded bg-emeraldBlue-50 dark:bg-emeraldBlue-950/40 text-emeraldBlue-700 dark:text-emeraldBlue-400 px-2.5 py-0.5 text-[10px] font-bold tracking-wide uppercase">
+                  {MES_LABEL[b.mes]} / {b.ano}
+                </span>
+                <ChevronRight className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-1" />
+              </div>
+              
+              <h3 className="mt-3 font-display font-bold text-slate-900 dark:text-white truncate text-base" title={b.empresaId}>
                 {b.empresaId}
               </h3>
-              <p className="mt-1 text-xs text-slate-500">Elaborado por {b.elaboradoPor}</p>
-              <div className="mt-4 flex gap-4 text-sm text-slate-600">
-                <span>
-                  <span className="font-semibold text-slate-900">{b._count.fichas}</span> ficha(s)
+              
+              <div className="mt-1 flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                <User className="h-3 w-3" />
+                Elaborado por: {b.elaboradoPor}
+              </div>
+              
+              <div className="mt-5 flex gap-4 text-xs border-t border-slate-100 dark:border-slate-800 pt-3 text-slate-650 dark:text-slate-400">
+                <span className="flex items-center gap-1">
+                  <FileText className="h-3.5 w-3.5 text-slate-450" />
+                  <strong className="text-slate-900 dark:text-white font-bold">{b._count.fichas}</strong> ficha(s)
                 </span>
-                <span>
-                  <span className="font-semibold text-slate-900">{b._count.ocorrencias}</span>{' '}
-                  ocorrência(s)
+                <span className="flex items-center gap-1">
+                  <AlertTriangle className="h-3.5 w-3.5 text-slate-450" />
+                  <strong className="text-slate-900 dark:text-white font-bold">{b._count.ocorrencias}</strong> ocorrência(s)
                 </span>
               </div>
             </Link>

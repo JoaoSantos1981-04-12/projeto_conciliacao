@@ -17,7 +17,7 @@ export function SeletorImportacao({ opcoes, atual }: { opcoes: Opcao[]; atual: s
         const v = e.target.value
         router.push(v ? `/relatorios?importacaoId=${v}` : '/relatorios')
       }}
-      className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm focus:border-brand focus:outline-none"
+      className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
     >
       <option value="">Todas as importações</option>
       {opcoes.map((o) => (

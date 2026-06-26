@@ -82,4 +82,24 @@ describe('Etapa 4 — parsers de suporte + router', () => {
     expect(extrato.itens.every((i) => i.tipo === 'ITEM_TRANSITO')).toBe(true)
     expect(extrato.itens.at(-1)?.saldo).toBeCloseTo(131384.2, 2)
   })
+
+  // ── Títulos em aberto CR/CP (TITULO_ABERTO) ──
+  const somaAberto = (r: RelatorioParseResult) =>
+    r.itens.reduce((acc, i) => acc + (i.valorAberto ?? 0), 0)
+
+  it('CR: extrai títulos em aberto; Σ valorAberto ≈ total impresso', () => {
+    expect(cr.itens.length).toBeGreaterThan(400)
+    expect(cr.itens.every((i) => i.tipo === 'TITULO_ABERTO')).toBe(true)
+    // Σ itens ≈ total impresso; residual conhecido < R$ 50 (1-2 registros de borda).
+    expect(Math.abs(somaAberto(cr) - 29637147.22)).toBeLessThan(50)
+    expect(cr.itens[0]?.nome).toBeTruthy()
+    expect(cr.itens[0]?.documento).toMatch(/^\d{9}$/)
+  })
+
+  it('CP: extrai títulos em aberto; Σ valorAberto = total impresso (exato)', () => {
+    expect(cp.itens.length).toBeGreaterThan(0)
+    expect(cp.itens.every((i) => i.tipo === 'TITULO_ABERTO')).toBe(true)
+    expect(somaAberto(cp)).toBeCloseTo(1046071.4, 2)
+    expect(cp.itens[0]?.nome).toBeTruthy()
+  })
 })

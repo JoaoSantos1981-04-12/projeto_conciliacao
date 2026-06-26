@@ -41,12 +41,12 @@ export function FiltrosLancamentos({ importacoes, contas }: Props) {
   )
 
   const selectCls =
-    'w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm focus:border-brand focus:outline-none'
+    'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-emeraldBlue-500 focus:ring-1 focus:ring-emeraldBlue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200'
 
   return (
-    <div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 rounded-xl border border-slate-200/60 bg-white p-5 shadow-sm sm:grid-cols-2 lg:grid-cols-4 dark:border-slate-800 dark:bg-slate-900 transition-colors">
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-500">Importação</label>
+        <label className="mb-1.5 block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Importação</label>
         <select className={selectCls} value={val('importacaoId')} onChange={(e) => aplicar({ importacaoId: e.target.value })}>
           <option value="">Todas</option>
           {importacoes.map((i) => (
@@ -58,7 +58,7 @@ export function FiltrosLancamentos({ importacoes, contas }: Props) {
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-500">Conta contábil</label>
+        <label className="mb-1.5 block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Conta contábil</label>
         <select className={selectCls} value={val('contaContabilId')} onChange={(e) => aplicar({ contaContabilId: e.target.value })}>
           <option value="">Todas</option>
           {contas.map((c) => (
@@ -70,7 +70,7 @@ export function FiltrosLancamentos({ importacoes, contas }: Props) {
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-500">Natureza</label>
+        <label className="mb-1.5 block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Natureza</label>
         <select className={selectCls} value={val('natureza')} onChange={(e) => aplicar({ natureza: e.target.value })}>
           <option value="">Todas</option>
           {NATUREZAS.map((n) => (
@@ -82,7 +82,7 @@ export function FiltrosLancamentos({ importacoes, contas }: Props) {
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-500">Status</label>
+        <label className="mb-1.5 block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</label>
         <select className={selectCls} value={val('status')} onChange={(e) => aplicar({ status: e.target.value })}>
           <option value="">Todos</option>
           {STATUS_CONCILIACAO.map((s) => (
@@ -94,17 +94,17 @@ export function FiltrosLancamentos({ importacoes, contas }: Props) {
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-500">De</label>
+        <label className="mb-1.5 block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">De</label>
         <input type="date" className={selectCls} defaultValue={val('de')} onBlur={(e) => aplicar({ de: e.target.value })} />
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-500">Até</label>
+        <label className="mb-1.5 block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Até</label>
         <input type="date" className={selectCls} defaultValue={val('ate')} onBlur={(e) => aplicar({ ate: e.target.value })} />
       </div>
 
       <div className="sm:col-span-2">
-        <label className="mb-1 block text-xs font-medium text-slate-500">Busca (documento, duplicata, parceiro)</label>
+        <label className="mb-1.5 block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Busca (documento, duplicata, parceiro)</label>
         <form
           onSubmit={(e) => {
             e.preventDefault()

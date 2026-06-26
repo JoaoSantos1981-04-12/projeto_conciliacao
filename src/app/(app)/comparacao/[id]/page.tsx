@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { ArrowLeft } from 'lucide-react'
 import { prisma } from '@/lib/db/prisma'
 import { carregarSessaoComparacao } from '@/lib/comparacao/consulta'
 import { ResumoComparacao } from '@/components/comparacao/ResumoComparacao'
@@ -71,13 +72,15 @@ export default async function SessaoComparacaoPage({ params }: { params: { id: s
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/comparacao" className="text-sm text-brand hover:underline">
-          ← Voltar para comparações
+        <Link href="/comparacao" className="inline-flex items-center gap-1 text-xs font-semibold text-emeraldBlue-600 hover:text-emeraldBlue-700 dark:text-emeraldBlue-400 dark:hover:text-emeraldBlue-300 uppercase tracking-wider mb-2">
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Comparações
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-slate-900">{sessao.nomeDescritivo}</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          {CENARIO_LABEL[sessao.cenario] ?? sessao.cenario} · {sessao.contaOrigem.codigo} (
-          {sessao.contaOrigem.nome}) → {sessao.contaDestino.codigo} ({sessao.contaDestino.nome}) ·{' '}
+        <h1 className="font-display text-3xl font-bold tracking-tight text-slate-900 dark:text-white">{sessao.nomeDescritivo}</h1>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          {CENARIO_LABEL[sessao.cenario] ?? sessao.cenario} ·{' '}
+          <span className="font-mono text-slate-700 dark:text-slate-350">{sessao.contaOrigem.codigo}</span> ({sessao.contaOrigem.nome}) →{' '}
+          <span className="font-mono text-slate-700 dark:text-slate-350">{sessao.contaDestino.codigo}</span> ({sessao.contaDestino.nome}) ·{' '}
           {formatData(sessao.periodoInicio)} a {formatData(sessao.periodoFim)}
         </p>
       </div>

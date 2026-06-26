@@ -41,10 +41,13 @@ const respostaModelo = {
 describe('Etapa 6 — análise LLM (Claude API)', () => {
   beforeEach(() => {
     process.env.ANTHROPIC_API_KEY = 'sk-test-key'
+    delete process.env.LLM_PROVIDER // padrão = anthropic
   })
   afterEach(() => {
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
+    delete process.env.LLM_PROVIDER
+    delete process.env.GEMINI_API_KEY
   })
 
   // ── B4: só TOLERANCIA/DIVERGENTE ──
@@ -137,5 +140,72 @@ describe('Etapa 6 — análise LLM (Claude API)', () => {
       })),
     )
     await expect(analisarFicha(payloadBase)).rejects.toThrow(/401/)
+  })
+})
+
+describe('análise LLM — provedor Gemini (LLM_PROVIDER=gemini)', () => {
+  const respostaGemini = {
+    candidates: [
+      {
+        content: {
+          parts: [
+            {
+              text: JSON.stringify({
+                naturezaDivergencia: 'Diferença de arredondamento.',
+                riscoContabil: 'BAIXO',
+                riscoFiscal: 'NENHUM',
+                acaoCorretiva: 'Documentar nota.',
+                responsavel: 'CONTABILIDADE',
+                materialidade: 'BAIXA',
+                notaParaRevisao: 'Imaterial.',
+              }),
+            },
+          ],
+        },
+      },
+    ],
+  }
+
+  beforeEach(() => {
+    process.env.LLM_PROVIDER = 'gemini'
+    process.env.GEMINI_API_KEY = 'gm-test-key'
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    delete process.env.LLM_PROVIDER
+    delete process.env.GEMINI_API_KEY
+  })
+
+  it('chama o endpoint Gemini com x-goog-api-key e maxOutputTokens 2000', async () => {
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => ({
+      ok: true,
+      json: async () => respostaGemini,
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await analisarFicha(payloadBase)
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toContain('generativelanguage.googleapis.com')
+    expect(url).toContain(':generateContent')
+    const headers = init.headers as Record<string, string>
+    expect(headers['x-goog-api-key']).toBe('gm-test-key')
+    const body = JSON.parse(init.body as string)
+    expect(body.generationConfig.maxOutputTokens).toBe(2000)
+    expect(body.generationConfig.temperature).toBe(0)
+  })
+
+  it('parseia a resposta Gemini no contrato §10.3', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => respostaGemini })))
+    const a = await analisarFicha(payloadBase)
+    expect(a.riscoContabil).toBe('BAIXO')
+    expect(a.responsavel).toBe('CONTABILIDADE')
+    expect(a.naturezaDivergencia).toMatch(/arredondamento/i)
+  })
+
+  it('lança erro claro se GEMINI_API_KEY estiver ausente', async () => {
+    delete process.env.GEMINI_API_KEY
+    await expect(analisarFicha(payloadBase)).rejects.toThrow(/GEMINI_API_KEY/)
   })
 })

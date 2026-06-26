@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { Play, Loader2, AlertCircle } from 'lucide-react'
 
 export function BotaoConciliar({
   importacaoId,
@@ -34,10 +35,25 @@ export function BotaoConciliar({
       type="button"
       onClick={conciliar}
       disabled={estado === 'rodando'}
-      className="rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+      className="inline-flex items-center gap-1.5 rounded-lg bg-emeraldBlue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-emeraldBlue-700 transition active:translate-y-px disabled:opacity-50 dark:bg-emeraldBlue-600 dark:hover:bg-emeraldBlue-500"
       title={estado === 'erro' ? 'Falha ao conciliar — tente novamente' : undefined}
     >
-      {estado === 'rodando' ? 'Conciliando…' : estado === 'erro' ? 'Erro — repetir' : label}
+      {estado === 'rodando' ? (
+        <>
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          Conciliando…
+        </>
+      ) : estado === 'erro' ? (
+        <>
+          <AlertCircle className="h-3.5 w-3.5 text-red-100" />
+          Erro — repetir
+        </>
+      ) : (
+        <>
+          <Play className="h-3 w-3 fill-current" />
+          {label}
+        </>
+      )}
     </button>
   )
 }
