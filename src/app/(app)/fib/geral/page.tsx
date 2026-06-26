@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import {
   BarChart,
   Bar,
@@ -17,7 +17,7 @@ import {
 import { AlertTriangle, TrendingUp, Zap } from 'lucide-react'
 import { useFibContext } from '@/lib/fib/context'
 import { DrillDownModal } from '@/components/fib/DrillDownModal'
-import { ContaClassificacao } from '@/lib/types/fib'
+import { ContaClassificacao, FibContaAgregada } from '@/lib/types/fib'
 
 const CORES = {
   [ContaClassificacao.RECEITA]: '#10b981',
@@ -28,14 +28,10 @@ const CORES = {
 }
 
 export default function FibGeralPage() {
-  const { dados, carregando, erro, atualizarDados } = useFibContext()
+  const { dados, carregando, erro } = useFibContext()
   const [drillDownAberto, setDrillDownAberto] = useState(false)
   const [drillDownTitulo, setDrillDownTitulo] = useState('')
-  const [drillDownContas, setDrillDownContas] = useState<any[]>([])
-
-  useEffect(() => {
-    atualizarDados()
-  }, [atualizarDados])
+  const [drillDownContas, setDrillDownContas] = useState<FibContaAgregada[]>([])
 
   if (carregando) {
     return (

@@ -1,16 +1,12 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React from 'react'
 import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { useFibContext } from '@/lib/fib/context'
 import { ContaClassificacao } from '@/lib/types/fib'
 
 export default function FibFiscalPage() {
-  const { dados, carregando, erro, atualizarDados } = useFibContext()
-
-  useEffect(() => {
-    atualizarDados()
-  }, [atualizarDados])
+  const { dados, carregando, erro } = useFibContext()
 
   if (carregando) {
     return (

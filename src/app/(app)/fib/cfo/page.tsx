@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React from 'react'
 import {
   BarChart,
   Bar,
@@ -16,11 +16,7 @@ import { AlertCircle, CheckCircle } from 'lucide-react'
 import { useFibContext } from '@/lib/fib/context'
 
 export default function FibCfoPage() {
-  const { dados, carregando, erro, atualizarDados } = useFibContext()
-
-  useEffect(() => {
-    atualizarDados()
-  }, [atualizarDados])
+  const { dados, carregando, erro } = useFibContext()
 
   if (carregando) {
     return (

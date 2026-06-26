@@ -65,13 +65,21 @@ export interface FibAlerta {
   recomendacao?: string
 }
 
+export interface FibImportacaoResumo {
+  id: string
+  empresa: string
+  nomeArquivo: string
+  periodoInicio: string | null // ISO date
+  periodoFim: string | null // ISO date
+}
+
 export interface FibContextType {
-  importacaoAtual: {
-    id: string
-    empresa: string
-  } | null
-  periodosDisponiveis: Array<{ id: string; nome: string }>
-  periodroSelecionado: { inicio: Date; fim: Date } | null
+  importacoesDisponiveis: FibImportacaoResumo[]
+  importacaoAtual: FibImportacaoResumo | null
+  selecionarImportacao: (id: string) => void
+  periodoSelecionado: { inicio: Date; fim: Date } | null
+  definirPeriodo: (inicio: Date | null, fim: Date | null) => void
+  carregandoImportacoes: boolean
   carregando: boolean
   dados: FibDashboardData | null
   erro: string | null

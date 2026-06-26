@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { Sparkles, Send, RefreshCw } from 'lucide-react'
 import { useFibContext } from '@/lib/fib/context'
 
@@ -11,14 +11,10 @@ interface Mensagem {
 }
 
 export default function FibIaPage() {
-  const { dados, carregando, erro, atualizarDados } = useFibContext()
+  const { dados, carregando, erro } = useFibContext()
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
   const [gerando, setGerando] = useState(false)
   const [insightGerado, setInsightGerado] = useState(false)
-
-  useEffect(() => {
-    atualizarDados()
-  }, [atualizarDados])
 
   const gerarInsight = async () => {
     if (!dados || insightGerado) return

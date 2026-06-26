@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React from 'react'
 import {
   BarChart,
   Bar,
@@ -17,11 +17,7 @@ import { TrendingUp, TrendingDown, Percent } from 'lucide-react'
 import { useFibContext } from '@/lib/fib/context'
 
 export default function FibCeoPage() {
-  const { dados, carregando, erro, atualizarDados } = useFibContext()
-
-  useEffect(() => {
-    atualizarDados()
-  }, [atualizarDados])
+  const { dados, carregando, erro } = useFibContext()
 
   if (carregando) {
     return (
