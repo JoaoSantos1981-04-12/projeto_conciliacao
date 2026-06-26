@@ -44,21 +44,22 @@ export function classificarConta(codigo: string): ContaClassificacao {
 }
 
 /**
- * Agregador de valores por conta (regra validada com o Contador Sênior — 2026-06-26).
+ * Agregador de valores por conta (convenção de sinal validada — 2026-06-26).
  *
  * NÃO somar a coluna `saldo` (é o SALDO CORRENTE ACUMULADO/running balance linha
- * a linha — somá-lo não tem significado contábil). Em vez disso, por classe:
- *   - Posição (Ativo/Passivo/PL/Outro): `saldoAnterior + Σdébito − Σcrédito`.
- *     Isso reproduz o saldo final da conta (a mesma fórmula que o ERP usa para
- *     o running balance; reconciliação `saldo = anterior + déb − créd` fecha
- *     165/165 no arquivo real — ver CLAUDE.md).
- *   - Fluxo (Receita/Despesa): somar a MOVIMENTAÇÃO do período — Receita = Σcrédito,
- *     Despesa = Σdébito.
+ * a linha — somá-lo não tem significado contábil). O valor de cada conta segue a
+ * NATUREZA contábil (saldo na direção credora/devedora é positivo):
+ *   - Ativo (devedora):        saldoAnterior + Σdébito − Σcrédito
+ *   - Passivo / PL (credora):  saldoAnterior + Σcrédito − Σdébito
+ *   - Receita (credora):       Σcrédito − Σdébito   (resultado: sem saldo de abertura)
+ *   - Despesa/Custo (devedora):Σdébito − Σcrédito   (resultado: sem saldo de abertura)
+ *   - Outro:                   saldoAnterior + Σdébito − Σcrédito (default devedor)
  *
- * ⚠️ Premissa: `saldoAnterior` é o saldo de abertura da conta. Logo, a posição
- * só fica exata quando o período cobre a conta desde o início. Para sub-períodos
- * arbitrários o saldo de abertura do recorte não é conhecido (limitação aceita
- * no MVP). Ver memória [[fib-implementation]].
+ * ⚠️ Premissas: (1) `saldoAnterior` é o saldo de abertura na natureza da conta —
+ * a posição só fica exata quando o período cobre a conta desde o início (sub-
+ * períodos não conhecem o saldo de abertura do recorte; limitação do MVP).
+ * (2) Contas de resultado não usam `saldoAnterior` (zeram a cada exercício).
+ * Ver memória [[fib-implementation]].
  */
 function agregasPorConta(lancamentos: LancamentoComConta[]): Map<
   string,
@@ -103,13 +104,26 @@ function agregasPorConta(lancamentos: LancamentoComConta[]): Map<
   >()
   for (const [codigo, e] of acc) {
     let valor: number
-    if (e.natureza === ContaClassificacao.RECEITA) {
-      valor = e.credito
-    } else if (e.natureza === ContaClassificacao.DESPESA) {
-      valor = e.debito
-    } else {
-      // Posição: saldoAnterior + Σdébito − Σcrédito
-      valor = e.saldoAnterior + e.debito - e.credito
+    switch (e.natureza) {
+      case ContaClassificacao.PASSIVO:
+      case ContaClassificacao.PATRIMONIO:
+        // Credora: saldoAnterior + Σcrédito − Σdébito
+        valor = e.saldoAnterior + e.credito - e.debito
+        break
+      case ContaClassificacao.RECEITA:
+        // Resultado credor: Σcrédito − Σdébito (sem saldo de abertura)
+        valor = e.credito - e.debito
+        break
+      case ContaClassificacao.DESPESA:
+        // Resultado devedor: Σdébito − Σcrédito (sem saldo de abertura)
+        valor = e.debito - e.credito
+        break
+      case ContaClassificacao.ATIVO:
+      case ContaClassificacao.OUTRO:
+      default:
+        // Devedora: saldoAnterior + Σdébito − Σcrédito
+        valor = e.saldoAnterior + e.debito - e.credito
+        break
     }
     mapa.set(codigo, { nome: e.nome, saldo: valor, natureza: e.natureza })
   }
@@ -235,10 +249,10 @@ export function agregarContas(
  * Agrupa os lançamentos por mês (competência) e agrega por classe, gerando a
  * série temporal usada nos gráficos de crescimento (CEO/CFO).
  *
- * Usa a movimentação do mês (mesma regra de fluxo de `agregasPorConta`):
- * Receita = Σcrédito, Despesa = Σdébito. O `ativo` mensal é a movimentação
- * líquida (Σdébito − Σcrédito) das contas de ativo no mês — um delta de
- * posição, não o saldo acumulado.
+ * Usa a movimentação líquida do mês, na natureza de cada conta (mesma convenção
+ * de `agregasPorConta`): Receita = Σcrédito − Σdébito, Despesa = Σdébito − Σcrédito.
+ * O `ativo` mensal é a movimentação líquida devedora (Σdébito − Σcrédito) das
+ * contas de ativo no mês — um delta de posição, não o saldo acumulado.
  */
 export function calcularSerieMensal(
   lancamentos: LancamentoComConta[]
@@ -263,8 +277,8 @@ export function calcularSerieMensal(
     const debito = Number(l.debito)
     const credito = Number(l.credito)
 
-    if (classe === ContaClassificacao.RECEITA) ponto.receitas += credito
-    else if (classe === ContaClassificacao.DESPESA) ponto.despesas += debito
+    if (classe === ContaClassificacao.RECEITA) ponto.receitas += credito - debito
+    else if (classe === ContaClassificacao.DESPESA) ponto.despesas += debito - credito
     else if (classe === ContaClassificacao.ATIVO) ponto.ativo += debito - credito
   }
 

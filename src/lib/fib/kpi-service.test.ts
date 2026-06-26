@@ -74,6 +74,27 @@ describe('agregarContas', () => {
     expect(r[ContaClassificacao.RECEITA][0].saldo).toBe(200)
   })
 
+  it('aplica a convenção de sinal por natureza da conta', () => {
+    const r = agregarContas([
+      // Ativo (devedora): 1000 + 200 déb − 50 créd = 1150
+      lanc('1.1.01', { saldoAnterior: 1000, debito: 200, credito: 50 }),
+      // Passivo (credora): 1000 + 500 créd − 100 déb = 1400
+      lanc('2.1.01', { saldoAnterior: 1000, credito: 500, debito: 100 }),
+      // PL (credora): 2000 + 300 créd − 0 = 2300
+      lanc('3.1.01', { saldoAnterior: 2000, credito: 300 }),
+      // Receita (credora, líquida): 300 créd − 50 déb = 250
+      lanc('4.1.01', { credito: 300, debito: 50 }),
+      // Despesa (devedora, líquida): 200 déb − 20 créd = 180
+      lanc('5.1.01', { debito: 200, credito: 20 }),
+    ])
+
+    expect(r[ContaClassificacao.ATIVO][0].saldo).toBe(1150)
+    expect(r[ContaClassificacao.PASSIVO][0].saldo).toBe(1400)
+    expect(r[ContaClassificacao.PATRIMONIO][0].saldo).toBe(2300)
+    expect(r[ContaClassificacao.RECEITA][0].saldo).toBe(250)
+    expect(r[ContaClassificacao.DESPESA][0].saldo).toBe(180)
+  })
+
   it('ordena contas por saldo absoluto decrescente', () => {
     const r = agregarContas([
       lanc('1.1.01', { saldoAnterior: 30 }),
