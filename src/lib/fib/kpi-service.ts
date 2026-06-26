@@ -43,7 +43,22 @@ export function classificarConta(codigo: string): ContaClassificacao {
 }
 
 /**
- * Agregador de valores por conta
+ * Agregador de valores por conta.
+ *
+ * ⚠️ PENDENTE DE VALIDAÇÃO COM O CONTADOR SÊNIOR (semântica de agregação).
+ * Hoje esta função SOMA a coluna `saldo` de todos os lançamentos da conta.
+ * Validado contra o banco real (importação HAILO, 165 lançamentos, conta
+ * 1.1.02.0101.100005): isso produz `ativoTotal = -453.687.466,15`, que NÃO
+ * tem significado contábil — `saldo` é o SALDO CORRENTE ACUMULADO (running
+ * balance) linha a linha (ver CLAUDE.md), então somá-lo é incorreto.
+ *
+ * A regra correta provavelmente é, por classe de conta:
+ *   - Contas de posição (Ativo/Passivo/PL): usar o SALDO FINAL (último
+ *     lançamento cronológico) — ou `saldoAnterior + Σdébito − Σcrédito`.
+ *   - Contas de fluxo (Receita/Despesa): somar a MOVIMENTAÇÃO (débito/crédito),
+ *     não o saldo.
+ * Não alterar até o Contador Sênior confirmar (mesma frente da regra de
+ * centavos). Ver memória do projeto: [[fib-implementation]].
  */
 function agregasPorConta(lancamentos: LancamentoComConta[]): Map<
   string,
