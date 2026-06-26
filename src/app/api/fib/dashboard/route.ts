@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db/prisma'
 import {
   calcularKpis,
   agregarContas,
   gerarAlertas,
-  classificarConta,
 } from '@/lib/fib/kpi-service'
 import { FibDashboardData } from '@/lib/types/fib'
 
@@ -44,6 +43,10 @@ export async function GET(req: NextRequest) {
               gte: periodoInicio ? new Date(periodoInicio) : undefined,
               lte: periodoFim ? new Date(periodoFim) : undefined,
             },
+          },
+          // Carrega o código/nome da conta para a classificação CPC.
+          include: {
+            contaContabil: { select: { codigo: true, nome: true } },
           },
         },
       },

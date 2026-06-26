@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { authOptions } from '@/lib/auth'
 import { FibDashboardData } from '@/lib/types/fib'
 
 const GEMINI_API_KEY = process.env.GOOGLE_API_KEY

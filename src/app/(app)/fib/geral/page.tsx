@@ -235,8 +235,8 @@ export default function FibGeralPage() {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, valor }) =>
-                  `${name}: R$ ${(valor / 1000).toFixed(0)}k`
+                label={(entry: { name?: string; valor?: number }) =>
+                  `${entry.name}: R$ ${((entry.valor ?? 0) / 1000).toFixed(0)}k`
                 }
                 outerRadius={80}
                 fill="#8884d8"

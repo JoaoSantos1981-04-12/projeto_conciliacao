@@ -53,7 +53,7 @@ export function FibProvider({ children }: { children: ReactNode }) {
 
   const valor: FibContextType = {
     importacaoAtual,
-    periodrosDisponiveis: [], // TODO: carregar do servidor
+    periodosDisponiveis: [], // TODO: carregar do servidor
     periodroSelecionado,
     carregando,
     dados,

@@ -1,10 +1,19 @@
-import { Lancamento } from '@prisma/client'
+import { Lancamento, ContaContabil } from '@prisma/client'
 import {
   FibKpi,
   FibContaAgregada,
   ContaClassificacao,
   FibAlerta,
 } from '@/lib/types/fib'
+
+/**
+ * Lançamento com a conta contábil relacionada carregada.
+ * A classificação CPC depende do `codigo` da conta (ex.: "1.1.02..."),
+ * NÃO do `contaContabilId` (que é um CUID).
+ */
+export type LancamentoComConta = Lancamento & {
+  contaContabil: Pick<ContaContabil, 'codigo' | 'nome'>
+}
 
 /**
  * Classifica contas contábeis baseado no primeiro dígito do código
@@ -36,7 +45,7 @@ export function classificarConta(codigo: string): ContaClassificacao {
 /**
  * Agregador de valores por conta
  */
-function agregasPorConta(lancamentos: Lancamento[]): Map<
+function agregasPorConta(lancamentos: LancamentoComConta[]): Map<
   string,
   { nome: string; saldo: number; natureza: ContaClassificacao }
 > {
@@ -46,15 +55,21 @@ function agregasPorConta(lancamentos: Lancamento[]): Map<
   >()
 
   for (const lancamento of lancamentos) {
-    const key = lancamento.contaContabilId
-    const classificacao = classificarConta(key)
+    // Classifica pelo código contábil (ex.: "1.1.02..."), não pelo CUID.
+    const codigo = lancamento.contaContabil.codigo
+    const classificacao = classificarConta(codigo)
 
-    if (!mapa.has(key)) {
-      mapa.set(key, { nome: key, saldo: 0, natureza: classificacao })
+    if (!mapa.has(codigo)) {
+      mapa.set(codigo, {
+        nome: lancamento.contaContabil.nome,
+        saldo: 0,
+        natureza: classificacao,
+      })
     }
 
-    const entrada = mapa.get(key)!
-    entrada.saldo += lancamento.saldo
+    const entrada = mapa.get(codigo)!
+    // saldo é Decimal no Prisma — converter para number do domínio.
+    entrada.saldo += Number(lancamento.saldo)
   }
 
   return mapa
@@ -64,7 +79,7 @@ function agregasPorConta(lancamentos: Lancamento[]): Map<
  * Calcula KPIs financeiros a partir dos lançamentos
  */
 export function calcularKpis(
-  lancamentos: Lancamento[],
+  lancamentos: LancamentoComConta[],
   importacaoId: string,
   periodo: { inicio: Date; fim: Date }
 ): FibKpi {
@@ -137,13 +152,12 @@ export function calcularKpis(
  * Agrega contas por classificação para exibição no dashboard
  */
 export function agregarContas(
-  lancamentos: Lancamento[]
+  lancamentos: LancamentoComConta[]
 ): Record<ContaClassificacao, FibContaAgregada[]> {
   const agregado = agregasPorConta(lancamentos)
-  const porClasse: Record<ContaClassificacao, FibContaAgregada[]> =
-    Object.fromEntries(
-      Object.values(ContaClassificacao).map((classe) => [classe, []])
-    ) as Record<ContaClassificacao, FibContaAgregada[]>
+  const porClasse = Object.fromEntries(
+    Object.values(ContaClassificacao).map((classe) => [classe, []])
+  ) as unknown as Record<ContaClassificacao, FibContaAgregada[]>
 
   // Calcular total por classe para percentual
   const totaisPorClasse = new Map<ContaClassificacao, number>()

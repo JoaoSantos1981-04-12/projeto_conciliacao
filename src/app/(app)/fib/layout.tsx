@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import React, { useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { FibProvider } from '@/lib/fib/context'
 import Link from 'next/link'
 import {
@@ -69,9 +69,10 @@ export default function FibLayout({
                 <select
                   className="px-3 py-2 rounded bg-slate-800 border border-slate-700 text-sm
                     hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  placeholder="Selecione empresa/importação"
+                  aria-label="Selecione empresa/importação"
+                  defaultValue=""
                 >
-                  <option value="">Importação</option>
+                  <option value="" disabled>Importação</option>
                 </select>
 
                 <input

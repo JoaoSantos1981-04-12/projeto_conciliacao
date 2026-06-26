@@ -178,7 +178,7 @@ export default function FibCfoPage() {
         <div className="space-y-3">
           {indicadoresLiquidez.map((ind, idx) => {
             const status = verificarLiquidez(ind.valor, ind.minimo)
-            const percentualOtimizacao = ((ind.valor / ind.ideal) * 100).toFixed(0)
+            const percentualOtimizacao = Math.round((ind.valor / ind.ideal) * 100)
             return (
               <div
                 key={idx}
