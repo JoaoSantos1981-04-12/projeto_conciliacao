@@ -8,6 +8,7 @@ const navItens = [
   { href: '/lancamentos', label: 'Lançamentos' },
   { href: '/conciliacao', label: 'Conciliação' },
   { href: '/comparacao', label: 'Comparação' },
+  { href: '/book', label: 'Book Digital' },
   { href: '/relatorios', label: 'Relatórios' },
 ]
 

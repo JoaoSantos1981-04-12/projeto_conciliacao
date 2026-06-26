@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
 }
 
 model User {
@@ -217,4 +218,182 @@ enum NaturezaLancamento {
   CONTRAPARTIDA_BAIXA_FORNECEDOR
   CONTRAPARTIDA_NF_SAIDA
   OUTRO
+}
+
+// ─── Book Digital ──────────────────────────────────────────────────────────
+
+model BookDigital {
+  id           String      @id @default(cuid())
+  empresaId    String
+  ano          Int
+  mes          Int
+  elaboradoPor String
+  status       BookStatus  @default(RASCUNHO)
+  criadoEm    DateTime    @default(now())
+  fichas       FichaConciliacao[]
+  ocorrencias  OcorrenciaBook[]
+
+  @@unique([empresaId, ano, mes])
+  @@index([empresaId, ano, mes])
+}
+
+model FichaConciliacao {
+  id                 String      @id @default(cuid())
+  bookId             String
+  tipoConta          TipoConta
+  codigoConta        String
+  nomeConta          String
+  saldoRazao         Decimal     @default(0) @db.Decimal(18, 2)
+  saldoBalancete     Decimal     @default(0) @db.Decimal(18, 2)
+  saldoRelatorio     Decimal     @default(0) @db.Decimal(18, 2)
+  tieRazaoBalancete  Boolean     @default(false)
+  tieRazaoRelatorio  Boolean     @default(false)
+  statusConciliacao  StatusFicha @default(PENDENTE)
+  observacao         String?
+  analiseLlm         Json?
+  criadoEm          DateTime    @default(now())
+  book               BookDigital         @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  pdfsSupporte       PdfSuporte[]
+  itens              ItemRelatorio[]
+  checkList          CheckListItem[]
+  ocorrencias        OcorrenciaBook[]
+
+  @@unique([bookId, codigoConta])
+  @@index([bookId])
+}
+
+model PdfSuporte {
+  id               String      @id @default(cuid())
+  fichaId          String
+  nomeArquivo      String
+  tipoRelatorio    TipoRelatorio
+  hash             String
+  parseStatus      ParseStatus @default(AGUARDANDO)
+  parseConfiavel   Boolean     @default(true)
+  deltaIntegridade Decimal     @default(0) @db.Decimal(18, 2)
+  saldoAnterior    Decimal?    @db.Decimal(18, 2)
+  saldoFinal       Decimal?    @db.Decimal(18, 2)
+  totalDebitos     Decimal?    @db.Decimal(18, 2)
+  totalCreditos    Decimal?    @db.Decimal(18, 2)
+  criadoEm        DateTime    @default(now())
+  ficha            FichaConciliacao @relation(fields: [fichaId], references: [id], onDelete: Cascade)
+  itens            ItemRelatorio[]
+
+  @@unique([fichaId, hash])
+  @@index([fichaId])
+}
+
+model ItemRelatorio {
+  id             String            @id @default(cuid())
+  fichaId        String
+  pdfSuporteId   String
+  tipo           TipoItemRelatorio
+  documento      String?
+  dupCr          String?
+  dupCp          String?
+  cnpj           String?
+  nome           String?
+  dataEmissao    DateTime?
+  dataVencimento DateTime?
+  diasAtraso     Int?
+  valorAberto    Decimal?          @db.Decimal(18, 2)
+  debito         Decimal?          @db.Decimal(18, 2)
+  credito        Decimal?          @db.Decimal(18, 2)
+  saldo          Decimal?          @db.Decimal(18, 2)
+  observacao     String?
+  criadoEm      DateTime          @default(now())
+  ficha          FichaConciliacao  @relation(fields: [fichaId], references: [id], onDelete: Cascade)
+  pdfSuporte     PdfSuporte        @relation(fields: [pdfSuporteId], references: [id], onDelete: Cascade)
+
+  @@index([fichaId])
+  @@index([pdfSuporteId])
+  @@index([dupCr])
+  @@index([dupCp])
+}
+
+model CheckListItem {
+  id           String           @id @default(cuid())
+  fichaId      String
+  descricao    String
+  status       StatusCheckList  @default(PENDENTE)
+  responsavel  String?
+  prazo        DateTime?
+  observacao   String?
+  criadoEm    DateTime         @default(now())
+  ficha        FichaConciliacao @relation(fields: [fichaId], references: [id], onDelete: Cascade)
+
+  @@index([fichaId])
+}
+
+model OcorrenciaBook {
+  id            String           @id @default(cuid())
+  bookId        String
+  fichaId       String?
+  descricao     String
+  status        StatusOcorrencia @default(ABERTA)
+  responsavel   String?
+  acaoCorretiva String?
+  prazo         DateTime?
+  nettingFlag   Boolean          @default(false)
+  criadoEm     DateTime         @default(now())
+  book          BookDigital      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  ficha         FichaConciliacao? @relation(fields: [fichaId], references: [id], onDelete: SetNull)
+
+  @@index([bookId])
+  @@index([fichaId])
+}
+
+enum BookStatus {
+  RASCUNHO
+  EM_REVISAO
+  APROVADO
+  FECHADO
+}
+
+enum StatusFicha {
+  PENDENTE
+  CONCILIADA
+  TOLERANCIA
+  DIVERGENTE
+}
+
+enum TipoConta {
+  ATIVO_CIRCULANTE
+  ATIVO_BANCO
+  PASSIVO_CIRCULANTE
+  RESULTADO
+  OUTROS
+}
+
+enum TipoRelatorio {
+  BALANCETE
+  CR_ABERTO
+  CP_ABERTO
+  EXTRATO_BANCARIO
+  OUTROS
+}
+
+enum ParseStatus {
+  AGUARDANDO
+  PROCESSANDO
+  CONCLUIDO
+  ERRO
+}
+
+enum StatusCheckList {
+  PENDENTE
+  CONCLUIDO
+  NAO_APLICAVEL
+}
+
+enum StatusOcorrencia {
+  ABERTA
+  EM_ANDAMENTO
+  RESOLVIDA
+  CANCELADA
+}
+
+enum TipoItemRelatorio {
+  TITULO_ABERTO
+  ITEM_TRANSITO
 }
