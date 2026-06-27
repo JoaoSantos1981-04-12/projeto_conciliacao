@@ -5,7 +5,11 @@ import {
   agregarContas,
   calcularSerieMensal,
   gerarAlertas,
+  classificarContaBalancete,
+  agregarContasBalancete,
+  calcularKpisBalancete,
   type LancamentoComConta,
+  type ContaBalancete,
 } from './kpi-service'
 import { ContaClassificacao, FibKpi } from '@/lib/types/fib'
 
@@ -195,5 +199,53 @@ describe('gerarAlertas', () => {
   it('não gera alertas de risco quando os indicadores estão saudáveis', () => {
     const alertas = gerarAlertas(base)
     expect(alertas.every((a) => a.tipo !== 'RISCO')).toBe(true)
+  })
+})
+
+// ─── Fonte balancete (Book Digital) ──────────────────────────────────────────
+
+describe('classificarContaBalancete', () => {
+  it('classifica pelo 1º dígito do plano do Book', () => {
+    expect(classificarContaBalancete('100006')).toBe(ContaClassificacao.ATIVO)
+    expect(classificarContaBalancete('200003')).toBe(ContaClassificacao.PASSIVO)
+    expect(classificarContaBalancete('300001')).toBe(ContaClassificacao.RECEITA)
+    expect(classificarContaBalancete('400001')).toBe(ContaClassificacao.DESPESA)
+    expect(classificarContaBalancete('500001')).toBe(ContaClassificacao.PROVISAO)
+    expect(classificarContaBalancete('')).toBe(ContaClassificacao.OUTRO)
+  })
+})
+
+describe('agregarContasBalancete / calcularKpisBalancete', () => {
+  const contas: ContaBalancete[] = [
+    { codigoConta: '100006', nomeConta: 'Clientes', saldo: 29637147.22, tipoConta: 'ATIVO_CIRCULANTE' },
+    { codigoConta: '100003', nomeConta: 'Citibank', saldo: 131384.2, tipoConta: 'ATIVO_BANCO' },
+    { codigoConta: '200003', nomeConta: 'Fornecedores', saldo: 1046071.39, tipoConta: 'PASSIVO_CIRCULANTE' },
+    { codigoConta: '300001', nomeConta: 'Vendas', saldo: 500000, tipoConta: 'RESULTADO' },
+    { codigoConta: '400001', nomeConta: 'Custos', saldo: 200000, tipoConta: 'RESULTADO' },
+  ]
+
+  it('agrupa por classe usando saldoBalancete', () => {
+    const r = agregarContasBalancete(contas)
+    expect(r[ContaClassificacao.ATIVO]).toHaveLength(2)
+    expect(r[ContaClassificacao.PASSIVO]).toHaveLength(1)
+    expect(r[ContaClassificacao.RECEITA][0].saldo).toBe(500000)
+    expect(r[ContaClassificacao.DESPESA][0].saldo).toBe(200000)
+    // Clientes domina a classe ATIVO
+    expect(r[ContaClassificacao.ATIVO][0].codigo).toBe('100006')
+  })
+
+  it('calcula KPIs: ativo/passivo/PL, caixa (ATIVO_BANCO) e lucro', () => {
+    const kpis = calcularKpisBalancete(contas, 'book1', {
+      inicio: new Date('2026-04-01'),
+      fim: new Date('2026-04-30'),
+    })
+    expect(kpis.ativoTotal).toBeCloseTo(29768531.42, 2)
+    expect(kpis.passivoTotal).toBeCloseTo(1046071.39, 2)
+    expect(kpis.patrimonioLiquido).toBeCloseTo(28722460.03, 2)
+    expect(kpis.saldoCaixa).toBeCloseTo(131384.2, 2) // só a conta ATIVO_BANCO
+    expect(kpis.totalReceitas).toBe(500000)
+    expect(kpis.totalDespesas).toBe(200000)
+    expect(kpis.lucroLiquido).toBe(300000)
+    expect(kpis.margemLiquida).toBeCloseTo(0.6, 5)
   })
 })

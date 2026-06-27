@@ -6,6 +6,7 @@ export enum ContaClassificacao {
   RECEITA = 'RECEITA',
   DESPESA = 'DESPESA',
   PATRIMONIO = 'PATRIMONIO',
+  PROVISAO = 'PROVISAO',
   OUTRO = 'OUTRO',
 }
 

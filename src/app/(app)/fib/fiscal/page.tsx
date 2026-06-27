@@ -45,9 +45,11 @@ export default function FibFiscalPage() {
 
   const { contasPorClassificacao, kpis } = dados!
 
-  // Contas fiscais reais = passivos cujo código começa em 2.1 ou 2.2.
+  // Fonte balancete: usa todas as contas de passivo (códigos iniciados em 2).
+  // O plano do Book não separa subgrupos fiscais por código, então listamos
+  // todo o passivo; o detalhamento fiscal fino depende do plano de contas.
   const passivos = contasPorClassificacao[ContaClassificacao.PASSIVO] || []
-  const contasFiscais = passivos.filter((c) => /^2\.[12]/.test(c.codigo))
+  const contasFiscais = passivos
 
   const totalPassivoFiscal = contasFiscais.reduce((s, c) => s + c.saldo, 0)
   const percentualPassivoFiscal =
@@ -86,7 +88,7 @@ export default function FibFiscalPage() {
           <p className="text-2xl font-bold text-blue-400 mt-2">
             {contasFiscais.length}
           </p>
-          <p className="text-xs text-slate-500 mt-2">códigos 2.1.x / 2.2.x</p>
+          <p className="text-xs text-slate-500 mt-2">passivo do balancete (cód. 2)</p>
         </div>
 
         <div className="p-6 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50">
@@ -120,7 +122,7 @@ export default function FibFiscalPage() {
             rounded-lg bg-slate-800/40 border border-slate-700/50">
             <Inbox className="w-8 h-8 text-slate-500" />
             <p className="text-slate-400 max-w-md">
-              Nenhuma conta de passivo fiscal (códigos 2.1.x / 2.2.x) foi
+              Nenhuma conta de passivo (código 2) foi
               identificada nesta importação.
             </p>
           </div>

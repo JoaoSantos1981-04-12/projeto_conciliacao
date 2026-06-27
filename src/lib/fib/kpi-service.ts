@@ -351,3 +351,160 @@ export function gerarAlertas(kpis: FibKpi): FibAlerta[] {
 
   return alertas
 }
+
+// ─── Fonte: Balancete do Book Digital ────────────────────────────────────────
+//
+// O FIB consome o saldo de fechamento por conta (`FichaConciliacao.saldoBalancete`)
+// de um BookDigital (empresa/mês). Diferente do razão, o balancete JÁ traz o saldo
+// final por conta — não há running balance para agregar.
+
+/** Conta do balancete normalizada (saldo em reais). */
+export interface ContaBalancete {
+  codigoConta: string
+  nomeConta: string
+  saldo: number // saldoBalancete
+  tipoConta: string // enum TipoConta do Book (p/ detectar caixa: ATIVO_BANCO)
+}
+
+/**
+ * Classificação do plano de contas do Book (por 1º dígito):
+ * 1=Ativo, 2=Passivo+PL, 3=Receitas, 4=Custos/Despesas, 5=Provisões.
+ */
+export function classificarContaBalancete(codigo: string): ContaClassificacao {
+  if (!codigo) return ContaClassificacao.OUTRO
+  switch (codigo.charAt(0)) {
+    case '1':
+      return ContaClassificacao.ATIVO
+    case '2':
+      return ContaClassificacao.PASSIVO // inclui Patrimônio Líquido
+    case '3':
+      return ContaClassificacao.RECEITA
+    case '4':
+      return ContaClassificacao.DESPESA // custos e despesas
+    case '5':
+      return ContaClassificacao.PROVISAO
+    default:
+      return ContaClassificacao.OUTRO
+  }
+}
+
+/** Agrupa as contas do balancete por classificação (saldo = saldoBalancete). */
+export function agregarContasBalancete(
+  contas: ContaBalancete[]
+): Record<ContaClassificacao, FibContaAgregada[]> {
+  const porClasse = Object.fromEntries(
+    Object.values(ContaClassificacao).map((c) => [c, []])
+  ) as unknown as Record<ContaClassificacao, FibContaAgregada[]>
+
+  const totaisPorClasse = new Map<ContaClassificacao, number>()
+  for (const c of contas) {
+    const classe = classificarContaBalancete(c.codigoConta)
+    totaisPorClasse.set(
+      classe,
+      (totaisPorClasse.get(classe) ?? 0) + Math.abs(c.saldo)
+    )
+  }
+
+  for (const c of contas) {
+    const classe = classificarContaBalancete(c.codigoConta)
+    const totalClasse = totaisPorClasse.get(classe) ?? 1
+    porClasse[classe].push({
+      codigo: c.codigoConta,
+      nome: c.nomeConta || c.codigoConta,
+      classificacao: classe,
+      saldo: c.saldo,
+      variacao: 0,
+      percentualDaClasse:
+        totalClasse > 0 ? (Math.abs(c.saldo) / totalClasse) * 100 : 0,
+    })
+  }
+
+  for (const classe of Object.values(ContaClassificacao)) {
+    porClasse[classe].sort((a, b) => Math.abs(b.saldo) - Math.abs(a.saldo))
+  }
+  return porClasse
+}
+
+/** Soma os saldos do balancete por classe (helper p/ KPIs e série). */
+function somarPorClasseBalancete(
+  contas: ContaBalancete[]
+): Record<ContaClassificacao, number> {
+  const soma = Object.fromEntries(
+    Object.values(ContaClassificacao).map((c) => [c, 0])
+  ) as Record<ContaClassificacao, number>
+  for (const c of contas) {
+    soma[classificarContaBalancete(c.codigoConta)] += c.saldo
+  }
+  return soma
+}
+
+/** Calcula KPIs a partir das contas do balancete. */
+export function calcularKpisBalancete(
+  contas: ContaBalancete[],
+  bookId: string,
+  periodo: { inicio: Date; fim: Date }
+): FibKpi {
+  const soma = somarPorClasseBalancete(contas)
+
+  const ativoTotal = soma[ContaClassificacao.ATIVO]
+  const passivoTotal = soma[ContaClassificacao.PASSIVO] // inclui PL
+  const totalReceitas = soma[ContaClassificacao.RECEITA]
+  const totalDespesas = soma[ContaClassificacao.DESPESA]
+  // PL não é separável por dígito (classe 2 = Passivo + PL); usa a identidade contábil.
+  const patrimonioLiquido = ativoTotal - passivoTotal
+
+  const lucroOperacional = totalReceitas - totalDespesas
+  const ebitda = lucroOperacional
+  const lucroLiquido = ebitda
+  const margemBruta = totalReceitas > 0 ? lucroOperacional / totalReceitas : 0
+  const margemOperacional = totalReceitas > 0 ? lucroOperacional / totalReceitas : 0
+  const margemLiquida = totalReceitas > 0 ? lucroLiquido / totalReceitas : 0
+
+  // Caixa = contas marcadas como ATIVO_BANCO no Book.
+  const saldoCaixa = contas
+    .filter((c) => c.tipoConta === 'ATIVO_BANCO')
+    .reduce((s, c) => s + c.saldo, 0)
+
+  const liquidezGeral = passivoTotal > 0 ? ativoTotal / passivoTotal : 0
+  const liquidezCorrente = liquidezGeral
+  const endividamento = ativoTotal > 0 ? passivoTotal / ativoTotal : 0
+  const roi = patrimonioLiquido > 0 ? lucroLiquido / patrimonioLiquido : 0
+
+  return {
+    id: `kpi-bal-${bookId}-${Date.now()}`,
+    importacaoId: bookId,
+    periodo,
+    totalReceitas,
+    totalDespesas,
+    ebitda,
+    lucroLiquido,
+    margemBruta,
+    margemOperacional,
+    margemLiquida,
+    ativoTotal,
+    passivoTotal,
+    patrimonioLiquido,
+    entradaCaixa: Math.max(0, saldoCaixa),
+    saidaCaixa: Math.max(0, -saldoCaixa),
+    saldoCaixa,
+    liquidezGeral,
+    liquidezCorrente,
+    endividamento,
+    roi,
+    criadoEm: new Date(),
+  }
+}
+
+/** Resumo de receita/despesa/ativo de um conjunto de contas (p/ série mensal). */
+export function resumoMensalBalancete(contas: ContaBalancete[]): {
+  receitas: number
+  despesas: number
+  ativo: number
+} {
+  const soma = somarPorClasseBalancete(contas)
+  return {
+    receitas: soma[ContaClassificacao.RECEITA],
+    despesas: soma[ContaClassificacao.DESPESA],
+    ativo: soma[ContaClassificacao.ATIVO],
+  }
+}
