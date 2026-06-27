@@ -2,6 +2,8 @@ import Link from 'next/link'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db/prisma'
 import { Plus, BookOpen, ChevronRight, FileText, AlertTriangle, Calendar, User } from 'lucide-react'
+import { BookStatusBadge } from '@/components/book/BookStatusBadge'
+import type { BookStatus } from '@/lib/types/book'
 
 export const metadata = { title: 'Book Digital · Conciliação Contábil' }
 export const dynamic = 'force-dynamic'
@@ -76,11 +78,14 @@ export default async function BookListPage() {
               href={`/book/${b.id}`}
               className="block rounded-xl border border-slate-200/60 bg-white p-5 shadow-sm hover:border-emeraldBlue-500 hover:shadow-md dark:border-slate-850 dark:bg-slate-900 transition-all group"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded bg-emeraldBlue-50 dark:bg-emeraldBlue-950/40 text-emeraldBlue-700 dark:text-emeraldBlue-400 px-2.5 py-0.5 text-[10px] font-bold tracking-wide uppercase">
                   {MES_LABEL[b.mes]} / {b.ano}
                 </span>
-                <ChevronRight className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-1" />
+                <div className="flex items-center gap-2">
+                  <BookStatusBadge status={b.status as BookStatus} />
+                  <ChevronRight className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-1" />
+                </div>
               </div>
               
               <h3 className="mt-3 font-display font-bold text-slate-900 dark:text-white truncate text-base" title={b.empresaId}>
