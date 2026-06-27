@@ -62,9 +62,9 @@ export default function FibIaPage() {
   if (!dados) return null // já coberto por `estado`; narrow para o TS
 
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] gap-6">
-      {/* Interface de Chat */}
-      <div className="flex-1 flex flex-col bg-gradient-to-br from-slate-800 to-slate-900
+    <div className="space-y-6">
+      {/* Interface de Chat (altura fixa própria, com scroll interno) */}
+      <div className="flex flex-col h-[480px] bg-gradient-to-br from-slate-800 to-slate-900
         border border-slate-700/50 rounded-lg overflow-hidden">
 
         {/* Histórico de Mensagens */}
