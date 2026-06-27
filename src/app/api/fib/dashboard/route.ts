@@ -17,10 +17,17 @@ export const dynamic = 'force-dynamic'
 
 /** Mapeia fichas do Prisma para o shape de balancete do kpi-service. */
 function mapearFichas(
-  fichas: { codigoConta: string; nomeConta: string; saldoBalancete: unknown; tipoConta: string }[]
+  fichas: {
+    codigoConta: string
+    codigoCompleto: string | null
+    nomeConta: string
+    saldoBalancete: unknown
+    tipoConta: string
+  }[]
 ): ContaBalancete[] {
   return fichas.map((f) => ({
     codigoConta: f.codigoConta,
+    codigoCompleto: f.codigoCompleto,
     nomeConta: f.nomeConta,
     saldo: Number(f.saldoBalancete),
     tipoConta: f.tipoConta,
@@ -56,6 +63,7 @@ export async function GET(req: NextRequest) {
         fichas: {
           select: {
             codigoConta: true,
+            codigoCompleto: true,
             nomeConta: true,
             saldoBalancete: true,
             tipoConta: true,
@@ -85,6 +93,7 @@ export async function GET(req: NextRequest) {
         fichas: {
           select: {
             codigoConta: true,
+            codigoCompleto: true,
             nomeConta: true,
             saldoBalancete: true,
             tipoConta: true,

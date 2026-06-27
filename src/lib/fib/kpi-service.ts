@@ -360,28 +360,80 @@ export function gerarAlertas(kpis: FibKpi): FibAlerta[] {
 
 /** Conta do balancete normalizada (saldo em reais). */
 export interface ContaBalancete {
-  codigoConta: string
+  codigoConta: string // leaf de 6 dígitos
+  codigoCompleto?: string | null // hierárquico (ex.: "1.01.01.01.100006")
   nomeConta: string
   saldo: number // saldoBalancete
   tipoConta: string // enum TipoConta do Book (p/ detectar caixa: ATIVO_BANCO)
 }
 
 /**
- * Classificação do plano de contas do Book (por 1º dígito):
- * 1=Ativo, 2=Passivo+PL, 3=Receitas, 4=Custos/Despesas, 5=Provisões.
+ * Subgrupo patrimonial pelos 2 PRIMEIROS NÍVEIS do código hierárquico
+ * (níveis separados por ponto, ex.: "1.01.01.01.100006"):
+ *   1.01=Ativo Circulante, 1.02=Ativo Não Circulante,
+ *   2.01=Passivo Circulante, 2.02=Passivo Não Circulante, 2.03=Patrimônio Líquido.
+ * Resultado/provisão seguem o 1º nível (3=Receita, 4=Despesa, 5=Provisão).
+ * Sem código completo, faz fallback pelo 1º dígito do leaf.
  */
-export function classificarContaBalancete(codigo: string): ContaClassificacao {
-  if (!codigo) return ContaClassificacao.OUTRO
-  switch (codigo.charAt(0)) {
-    case '1':
+export type SubgrupoConta =
+  | 'ATIVO_CIRCULANTE'
+  | 'ATIVO_NAO_CIRCULANTE'
+  | 'PASSIVO_CIRCULANTE'
+  | 'PASSIVO_NAO_CIRCULANTE'
+  | 'PATRIMONIO_LIQUIDO'
+  | 'RECEITA'
+  | 'DESPESA'
+  | 'PROVISAO'
+  | 'OUTRO'
+
+export function subgrupoConta(
+  codigoCompleto: string | null | undefined,
+  codigoLeaf?: string
+): SubgrupoConta {
+  const niveis = (codigoCompleto ?? '').split('.')
+  const n1 = niveis[0]
+  // Nível 2 numérico: tolera "1" e "01" (formato real usa 1 dígito: "1.1").
+  const l2 = niveis[1] !== undefined ? parseInt(niveis[1], 10) : NaN
+
+  if (n1 && !Number.isNaN(l2)) {
+    if (n1 === '1' && l2 === 1) return 'ATIVO_CIRCULANTE'
+    if (n1 === '1' && l2 === 2) return 'ATIVO_NAO_CIRCULANTE'
+    if (n1 === '2' && l2 === 1) return 'PASSIVO_CIRCULANTE'
+    if (n1 === '2' && l2 === 2) return 'PASSIVO_NAO_CIRCULANTE'
+    if (n1 === '2' && l2 === 3) return 'PATRIMONIO_LIQUIDO'
+  }
+
+  // Fallback: 1º nível do código completo, ou 1º dígito do leaf.
+  const primeiro = n1 || (codigoLeaf ?? '').charAt(0)
+  switch (primeiro) {
+    case '1': return 'ATIVO_CIRCULANTE'
+    case '2': return 'PASSIVO_CIRCULANTE'
+    case '3': return 'RECEITA'
+    case '4': return 'DESPESA'
+    case '5': return 'PROVISAO'
+    default: return 'OUTRO'
+  }
+}
+
+/** Classe FIB (consolidada) da conta do balancete. */
+export function classificarContaBalancete(
+  codigoCompleto: string | null | undefined,
+  codigoLeaf?: string
+): ContaClassificacao {
+  switch (subgrupoConta(codigoCompleto, codigoLeaf)) {
+    case 'ATIVO_CIRCULANTE':
+    case 'ATIVO_NAO_CIRCULANTE':
       return ContaClassificacao.ATIVO
-    case '2':
-      return ContaClassificacao.PASSIVO // inclui Patrimônio Líquido
-    case '3':
+    case 'PASSIVO_CIRCULANTE':
+    case 'PASSIVO_NAO_CIRCULANTE':
+      return ContaClassificacao.PASSIVO // exigível (PL é separado)
+    case 'PATRIMONIO_LIQUIDO':
+      return ContaClassificacao.PATRIMONIO
+    case 'RECEITA':
       return ContaClassificacao.RECEITA
-    case '4':
-      return ContaClassificacao.DESPESA // custos e despesas
-    case '5':
+    case 'DESPESA':
+      return ContaClassificacao.DESPESA
+    case 'PROVISAO':
       return ContaClassificacao.PROVISAO
     default:
       return ContaClassificacao.OUTRO
@@ -398,7 +450,7 @@ export function agregarContasBalancete(
 
   const totaisPorClasse = new Map<ContaClassificacao, number>()
   for (const c of contas) {
-    const classe = classificarContaBalancete(c.codigoConta)
+    const classe = classificarContaBalancete(c.codigoCompleto, c.codigoConta)
     totaisPorClasse.set(
       classe,
       (totaisPorClasse.get(classe) ?? 0) + Math.abs(c.saldo)
@@ -406,7 +458,7 @@ export function agregarContasBalancete(
   }
 
   for (const c of contas) {
-    const classe = classificarContaBalancete(c.codigoConta)
+    const classe = classificarContaBalancete(c.codigoCompleto, c.codigoConta)
     const totalClasse = totaisPorClasse.get(classe) ?? 1
     porClasse[classe].push({
       codigo: c.codigoConta,
@@ -433,7 +485,7 @@ function somarPorClasseBalancete(
     Object.values(ContaClassificacao).map((c) => [c, 0])
   ) as Record<ContaClassificacao, number>
   for (const c of contas) {
-    soma[classificarContaBalancete(c.codigoConta)] += c.saldo
+    soma[classificarContaBalancete(c.codigoCompleto, c.codigoConta)] += c.saldo
   }
   return soma
 }
@@ -444,14 +496,29 @@ export function calcularKpisBalancete(
   bookId: string,
   periodo: { inicio: Date; fim: Date }
 ): FibKpi {
-  const soma = somarPorClasseBalancete(contas)
+  // Soma por subgrupo patrimonial (2 primeiros níveis) — permite liquidez correta.
+  let ativoCirculante = 0
+  let ativoNaoCirculante = 0
+  let passivoCirculante = 0
+  let passivoNaoCirculante = 0
+  let patrimonioLiquido = 0
+  let totalReceitas = 0
+  let totalDespesas = 0
+  for (const c of contas) {
+    switch (subgrupoConta(c.codigoCompleto, c.codigoConta)) {
+      case 'ATIVO_CIRCULANTE': ativoCirculante += c.saldo; break
+      case 'ATIVO_NAO_CIRCULANTE': ativoNaoCirculante += c.saldo; break
+      case 'PASSIVO_CIRCULANTE': passivoCirculante += c.saldo; break
+      case 'PASSIVO_NAO_CIRCULANTE': passivoNaoCirculante += c.saldo; break
+      case 'PATRIMONIO_LIQUIDO': patrimonioLiquido += c.saldo; break
+      case 'RECEITA': totalReceitas += c.saldo; break
+      case 'DESPESA': totalDespesas += c.saldo; break
+    }
+  }
 
-  const ativoTotal = soma[ContaClassificacao.ATIVO]
-  const passivoTotal = soma[ContaClassificacao.PASSIVO] // inclui PL
-  const totalReceitas = soma[ContaClassificacao.RECEITA]
-  const totalDespesas = soma[ContaClassificacao.DESPESA]
-  // PL não é separável por dígito (classe 2 = Passivo + PL); usa a identidade contábil.
-  const patrimonioLiquido = ativoTotal - passivoTotal
+  const ativoTotal = ativoCirculante + ativoNaoCirculante
+  const passivoExigivel = passivoCirculante + passivoNaoCirculante // sem PL
+  const passivoTotal = passivoExigivel
 
   const lucroOperacional = totalReceitas - totalDespesas
   const ebitda = lucroOperacional
@@ -465,9 +532,11 @@ export function calcularKpisBalancete(
     .filter((c) => c.tipoConta === 'ATIVO_BANCO')
     .reduce((s, c) => s + c.saldo, 0)
 
-  const liquidezGeral = passivoTotal > 0 ? ativoTotal / passivoTotal : 0
-  const liquidezCorrente = liquidezGeral
-  const endividamento = ativoTotal > 0 ? passivoTotal / ativoTotal : 0
+  // Liquidez corrente = Ativo Circulante / Passivo Circulante.
+  // Liquidez geral = Ativo Total / Passivo Exigível (sem PL).
+  const liquidezCorrente = passivoCirculante > 0 ? ativoCirculante / passivoCirculante : 0
+  const liquidezGeral = passivoExigivel > 0 ? ativoTotal / passivoExigivel : 0
+  const endividamento = ativoTotal > 0 ? passivoExigivel / ativoTotal : 0
   const roi = patrimonioLiquido > 0 ? lucroLiquido / patrimonioLiquido : 0
 
   return {

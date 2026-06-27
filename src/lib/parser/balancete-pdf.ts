@@ -15,9 +15,10 @@ import { BalanceteParseResult, BalanceteConta, ParseErroPdf } from '@/lib/types/
  * 100003 → 131.384,20 (todos = saldo final do razão correspondente).
  */
 
-// Captura: saldoAtual, crédito, saldoAnterior, código(6 díg.), débito.
+// Captura: saldoAtual, crédito, saldoAnterior, código COMPLETO (hierárquico
+// + leaf de 6 díg., ex.: "1.01.01.01.100006"), débito.
 const RE_CONTA =
-  /([\d.]+,\d{2}) ([\d.]+,\d{2}) ([\d.]+,\d{2})\n\s*[\d.]+\.(\d{6})\n\s*([\d.]+,\d{2})/g
+  /([\d.]+,\d{2}) ([\d.]+,\d{2}) ([\d.]+,\d{2})\n\s*([\d.]+\.\d{6})\n\s*([\d.]+,\d{2})/g
 
 export async function parseBalancete(buffer: Buffer): Promise<BalanceteParseResult> {
   const { text } = await pdf(buffer)
@@ -32,8 +33,11 @@ export function parseBalanceteTexto(text: string): BalanceteParseResult {
   let m: RegExpExecArray | null
   RE_CONTA.lastIndex = 0
   while ((m = RE_CONTA.exec(text)) !== null) {
+    const codigoCompleto = m[4] // ex.: "1.01.01.01.100006"
+    const codigoConta = codigoCompleto.slice(-6) // leaf de 6 dígitos (chave de amarração)
     const conta: BalanceteConta = {
-      codigoConta: m[4],
+      codigoConta,
+      codigoCompleto,
       saldoAtual: parseMoney(m[1]),
       totalCredito: parseMoney(m[2]),
       saldoAnterior: parseMoney(m[3]),

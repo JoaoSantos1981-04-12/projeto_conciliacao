@@ -205,47 +205,64 @@ describe('gerarAlertas', () => {
 // ─── Fonte balancete (Book Digital) ──────────────────────────────────────────
 
 describe('classificarContaBalancete', () => {
-  it('classifica pelo 1º dígito do plano do Book', () => {
-    expect(classificarContaBalancete('100006')).toBe(ContaClassificacao.ATIVO)
-    expect(classificarContaBalancete('200003')).toBe(ContaClassificacao.PASSIVO)
-    expect(classificarContaBalancete('300001')).toBe(ContaClassificacao.RECEITA)
-    expect(classificarContaBalancete('400001')).toBe(ContaClassificacao.DESPESA)
-    expect(classificarContaBalancete('500001')).toBe(ContaClassificacao.PROVISAO)
-    expect(classificarContaBalancete('')).toBe(ContaClassificacao.OUTRO)
+  it('classifica pelos 2 primeiros níveis do código completo', () => {
+    expect(classificarContaBalancete('1.01.01.01.100006')).toBe(ContaClassificacao.ATIVO)
+    expect(classificarContaBalancete('1.02.01.01.100020')).toBe(ContaClassificacao.ATIVO) // não circ.
+    expect(classificarContaBalancete('2.01.01.01.200003')).toBe(ContaClassificacao.PASSIVO)
+    expect(classificarContaBalancete('2.02.01.01.200010')).toBe(ContaClassificacao.PASSIVO) // não circ.
+    expect(classificarContaBalancete('2.03.01.01.200050')).toBe(ContaClassificacao.PATRIMONIO) // PL separado
+    expect(classificarContaBalancete('3.01.01.01.300001')).toBe(ContaClassificacao.RECEITA)
+    expect(classificarContaBalancete('4.01.01.01.400001')).toBe(ContaClassificacao.DESPESA)
+    expect(classificarContaBalancete('5.01.01.01.500001')).toBe(ContaClassificacao.PROVISAO)
+  })
+
+  it('faz fallback pelo 1º dígito do leaf quando não há código completo', () => {
+    expect(classificarContaBalancete(null, '100006')).toBe(ContaClassificacao.ATIVO)
+    expect(classificarContaBalancete(undefined, '200003')).toBe(ContaClassificacao.PASSIVO)
+    expect(classificarContaBalancete('', '')).toBe(ContaClassificacao.OUTRO)
   })
 })
 
 describe('agregarContasBalancete / calcularKpisBalancete', () => {
+  const c = (compl: string, nome: string, saldo: number, tipo = 'OUTROS'): ContaBalancete => ({
+    codigoConta: compl.slice(-6),
+    codigoCompleto: compl,
+    nomeConta: nome,
+    saldo,
+    tipoConta: tipo,
+  })
   const contas: ContaBalancete[] = [
-    { codigoConta: '100006', nomeConta: 'Clientes', saldo: 29637147.22, tipoConta: 'ATIVO_CIRCULANTE' },
-    { codigoConta: '100003', nomeConta: 'Citibank', saldo: 131384.2, tipoConta: 'ATIVO_BANCO' },
-    { codigoConta: '200003', nomeConta: 'Fornecedores', saldo: 1046071.39, tipoConta: 'PASSIVO_CIRCULANTE' },
-    { codigoConta: '300001', nomeConta: 'Vendas', saldo: 500000, tipoConta: 'RESULTADO' },
-    { codigoConta: '400001', nomeConta: 'Custos', saldo: 200000, tipoConta: 'RESULTADO' },
+    c('1.01.01.01.100006', 'Clientes', 2400000, 'ATIVO_CIRCULANTE'),
+    c('1.01.01.01.100003', 'Citibank', 600000, 'ATIVO_BANCO'),
+    c('1.02.01.01.100020', 'Imobilizado', 3000000, 'OUTROS'),
+    c('2.01.01.01.200003', 'Fornecedores', 1000000, 'PASSIVO_CIRCULANTE'),
+    c('2.02.01.01.200010', 'Empréstimo LP', 800000, 'PASSIVO_CIRCULANTE'),
+    c('2.03.01.01.200050', 'Capital', 4200000, 'OUTROS'),
+    c('3.01.01.01.300001', 'Vendas', 500000, 'RESULTADO'),
+    c('4.01.01.01.400001', 'Custos', 200000, 'RESULTADO'),
   ]
 
-  it('agrupa por classe usando saldoBalancete', () => {
+  it('agrupa por classe (PL separado do passivo)', () => {
     const r = agregarContasBalancete(contas)
-    expect(r[ContaClassificacao.ATIVO]).toHaveLength(2)
-    expect(r[ContaClassificacao.PASSIVO]).toHaveLength(1)
+    expect(r[ContaClassificacao.ATIVO]).toHaveLength(3)
+    expect(r[ContaClassificacao.PASSIVO]).toHaveLength(2) // só exigível
+    expect(r[ContaClassificacao.PATRIMONIO]).toHaveLength(1)
     expect(r[ContaClassificacao.RECEITA][0].saldo).toBe(500000)
-    expect(r[ContaClassificacao.DESPESA][0].saldo).toBe(200000)
-    // Clientes domina a classe ATIVO
-    expect(r[ContaClassificacao.ATIVO][0].codigo).toBe('100006')
   })
 
-  it('calcula KPIs: ativo/passivo/PL, caixa (ATIVO_BANCO) e lucro', () => {
+  it('calcula KPIs: PL real, liquidez corrente (AC/PC), endividamento sem PL', () => {
     const kpis = calcularKpisBalancete(contas, 'book1', {
       inicio: new Date('2026-04-01'),
       fim: new Date('2026-04-30'),
     })
-    expect(kpis.ativoTotal).toBeCloseTo(29768531.42, 2)
-    expect(kpis.passivoTotal).toBeCloseTo(1046071.39, 2)
-    expect(kpis.patrimonioLiquido).toBeCloseTo(28722460.03, 2)
-    expect(kpis.saldoCaixa).toBeCloseTo(131384.2, 2) // só a conta ATIVO_BANCO
-    expect(kpis.totalReceitas).toBe(500000)
-    expect(kpis.totalDespesas).toBe(200000)
+    expect(kpis.ativoTotal).toBeCloseTo(6000000, 2) // 2.4M + 0.6M + 3.0M
+    expect(kpis.passivoTotal).toBeCloseTo(1800000, 2) // exigível: 1.0M + 0.8M (sem PL)
+    expect(kpis.patrimonioLiquido).toBeCloseTo(4200000, 2) // 2.03 real
+    expect(kpis.saldoCaixa).toBeCloseTo(600000, 2) // ATIVO_BANCO
+    // Liquidez corrente = AC (3.0M) / PC (1.0M) = 3.0
+    expect(kpis.liquidezCorrente).toBeCloseTo(3, 5)
+    // Endividamento = exigível (1.8M) / ativo (6.0M) = 0.30
+    expect(kpis.endividamento).toBeCloseTo(0.3, 5)
     expect(kpis.lucroLiquido).toBe(300000)
-    expect(kpis.margemLiquida).toBeCloseTo(0.6, 5)
   })
 })

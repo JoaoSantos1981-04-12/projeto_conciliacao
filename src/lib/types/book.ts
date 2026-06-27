@@ -135,7 +135,8 @@ export interface DeteccaoPdf {
 
 /** Saldos de uma conta-folha do balancete (NSQP1106). */
 export interface BalanceteConta {
-  codigoConta: string // 6 dígitos (ex.: "100006")
+  codigoConta: string // leaf de 6 dígitos (ex.: "100006") — chave de amarração
+  codigoCompleto: string // hierárquico (ex.: "1.01.01.01.100006") — p/ subtotais/classe
   saldoAnterior: number
   saldoAtual: number // saldo oficial — âncora da amarração
   totalDebito: number

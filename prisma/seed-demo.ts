@@ -87,6 +87,23 @@ function classe(codigo: string): '1' | '2' | '3' | '4' | '5' | 'x' {
   return d === '1' || d === '2' || d === '3' || d === '4' || d === '5' ? d : 'x'
 }
 
+// Subgrupo (2 primeiros níveis) por conta. O leaf NÃO muda; só montamos o
+// código hierárquico completo. Default = "<dígito>.01"; overrides p/ não
+// circulante e PL.
+// Formato real: nível 2 com 1 dígito (ex.: "1.1" = Ativo Circulante).
+const SUB_OVERRIDE: Record<string, string> = {
+  '100020': '1.2', '100021': '1.2', // Ativo Não Circulante (imobilizado)
+  '200010': '2.2', // Passivo Não Circulante (empréstimo LP)
+  '200050': '2.3', '200051': '2.3', // Patrimônio Líquido
+}
+function prefixo2(codigo: string): string {
+  return SUB_OVERRIDE[codigo] ?? `${codigo.charAt(0)}.1`
+}
+/** Código hierárquico completo (ex.: "1.1.01.01.100006") — leaf preservado. */
+function codigoCompleto(codigo: string): string {
+  return `${prefixo2(codigo)}.01.01.${codigo}`
+}
+
 async function main() {
   console.log(`Seed de demonstração — empresa "${EMPRESA}", ${MESES.length} meses\n`)
 
@@ -146,6 +163,7 @@ async function main() {
           bookId: book.id,
           tipoConta: c.tipo as never,
           codigoConta: c.codigo,
+          codigoCompleto: codigoCompleto(c.codigo),
           nomeConta: c.nome,
           saldoRazao,
           saldoBalancete,
@@ -157,6 +175,7 @@ async function main() {
         update: {
           nomeConta: c.nome,
           tipoConta: c.tipo as never,
+          codigoCompleto: codigoCompleto(c.codigo),
           saldoRazao,
           saldoBalancete,
           saldoRelatorio,

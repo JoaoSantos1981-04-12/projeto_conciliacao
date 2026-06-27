@@ -190,7 +190,8 @@ async function processarBalancete(
     if (!conta) continue
     await prisma.fichaConciliacao.update({
       where: { id: ficha.id },
-      data: { saldoBalancete: conta.saldoAtual },
+      // O balancete é a única fonte com o código hierárquico completo.
+      data: { saldoBalancete: conta.saldoAtual, codigoCompleto: conta.codigoCompleto },
     })
     await upsertPdfSuporte(prisma, ficha.id, arq, 'BALANCETE', {
       parseConfiavel: bal.erros.length === 0,
