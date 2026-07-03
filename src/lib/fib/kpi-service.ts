@@ -351,3 +351,229 @@ export function gerarAlertas(kpis: FibKpi): FibAlerta[] {
 
   return alertas
 }
+
+// ─── Fonte: Balancete do Book Digital ────────────────────────────────────────
+//
+// O FIB consome o saldo de fechamento por conta (`FichaConciliacao.saldoBalancete`)
+// de um BookDigital (empresa/mês). Diferente do razão, o balancete JÁ traz o saldo
+// final por conta — não há running balance para agregar.
+
+/** Conta do balancete normalizada (saldo em reais). */
+export interface ContaBalancete {
+  codigoConta: string // leaf de 6 dígitos
+  codigoCompleto?: string | null // hierárquico (ex.: "1.01.01.01.100006")
+  nomeConta: string
+  saldo: number // saldoBalancete
+  tipoConta: string // enum TipoConta do Book (p/ detectar caixa: ATIVO_BANCO)
+}
+
+/**
+ * Subgrupo patrimonial pelos 2 PRIMEIROS NÍVEIS do código hierárquico
+ * (níveis separados por ponto, ex.: "1.01.01.01.100006"):
+ *   1.01=Ativo Circulante, 1.02=Ativo Não Circulante,
+ *   2.01=Passivo Circulante, 2.02=Passivo Não Circulante, 2.03=Patrimônio Líquido.
+ * Resultado/provisão seguem o 1º nível (3=Receita, 4=Despesa, 5=Provisão).
+ * Sem código completo, faz fallback pelo 1º dígito do leaf.
+ */
+export type SubgrupoConta =
+  | 'ATIVO_CIRCULANTE'
+  | 'ATIVO_NAO_CIRCULANTE'
+  | 'PASSIVO_CIRCULANTE'
+  | 'PASSIVO_NAO_CIRCULANTE'
+  | 'PATRIMONIO_LIQUIDO'
+  | 'RECEITA'
+  | 'DESPESA'
+  | 'PROVISAO'
+  | 'OUTRO'
+
+export function subgrupoConta(
+  codigoCompleto: string | null | undefined,
+  codigoLeaf?: string
+): SubgrupoConta {
+  const niveis = (codigoCompleto ?? '').split('.')
+  const n1 = niveis[0]
+  // Nível 2 numérico: tolera "1" e "01" (formato real usa 1 dígito: "1.1").
+  const l2 = niveis[1] !== undefined ? parseInt(niveis[1], 10) : NaN
+
+  if (n1 && !Number.isNaN(l2)) {
+    if (n1 === '1' && l2 === 1) return 'ATIVO_CIRCULANTE'
+    if (n1 === '1' && l2 === 2) return 'ATIVO_NAO_CIRCULANTE'
+    if (n1 === '2' && l2 === 1) return 'PASSIVO_CIRCULANTE'
+    if (n1 === '2' && l2 === 2) return 'PASSIVO_NAO_CIRCULANTE'
+    if (n1 === '2' && l2 === 3) return 'PATRIMONIO_LIQUIDO'
+  }
+
+  // Fallback: 1º nível do código completo, ou 1º dígito do leaf.
+  const primeiro = n1 || (codigoLeaf ?? '').charAt(0)
+  switch (primeiro) {
+    case '1': return 'ATIVO_CIRCULANTE'
+    case '2': return 'PASSIVO_CIRCULANTE'
+    case '3': return 'RECEITA'
+    case '4': return 'DESPESA'
+    case '5': return 'PROVISAO'
+    default: return 'OUTRO'
+  }
+}
+
+/** Classe FIB (consolidada) da conta do balancete. */
+export function classificarContaBalancete(
+  codigoCompleto: string | null | undefined,
+  codigoLeaf?: string
+): ContaClassificacao {
+  switch (subgrupoConta(codigoCompleto, codigoLeaf)) {
+    case 'ATIVO_CIRCULANTE':
+    case 'ATIVO_NAO_CIRCULANTE':
+      return ContaClassificacao.ATIVO
+    case 'PASSIVO_CIRCULANTE':
+    case 'PASSIVO_NAO_CIRCULANTE':
+      return ContaClassificacao.PASSIVO // exigível (PL é separado)
+    case 'PATRIMONIO_LIQUIDO':
+      return ContaClassificacao.PATRIMONIO
+    case 'RECEITA':
+      return ContaClassificacao.RECEITA
+    case 'DESPESA':
+      return ContaClassificacao.DESPESA
+    case 'PROVISAO':
+      return ContaClassificacao.PROVISAO
+    default:
+      return ContaClassificacao.OUTRO
+  }
+}
+
+/** Agrupa as contas do balancete por classificação (saldo = saldoBalancete). */
+export function agregarContasBalancete(
+  contas: ContaBalancete[]
+): Record<ContaClassificacao, FibContaAgregada[]> {
+  const porClasse = Object.fromEntries(
+    Object.values(ContaClassificacao).map((c) => [c, []])
+  ) as unknown as Record<ContaClassificacao, FibContaAgregada[]>
+
+  const totaisPorClasse = new Map<ContaClassificacao, number>()
+  for (const c of contas) {
+    const classe = classificarContaBalancete(c.codigoCompleto, c.codigoConta)
+    totaisPorClasse.set(
+      classe,
+      (totaisPorClasse.get(classe) ?? 0) + Math.abs(c.saldo)
+    )
+  }
+
+  for (const c of contas) {
+    const classe = classificarContaBalancete(c.codigoCompleto, c.codigoConta)
+    const totalClasse = totaisPorClasse.get(classe) ?? 1
+    porClasse[classe].push({
+      codigo: c.codigoConta,
+      nome: c.nomeConta || c.codigoConta,
+      classificacao: classe,
+      saldo: c.saldo,
+      variacao: 0,
+      percentualDaClasse:
+        totalClasse > 0 ? (Math.abs(c.saldo) / totalClasse) * 100 : 0,
+    })
+  }
+
+  for (const classe of Object.values(ContaClassificacao)) {
+    porClasse[classe].sort((a, b) => Math.abs(b.saldo) - Math.abs(a.saldo))
+  }
+  return porClasse
+}
+
+/** Soma os saldos do balancete por classe (helper p/ KPIs e série). */
+function somarPorClasseBalancete(
+  contas: ContaBalancete[]
+): Record<ContaClassificacao, number> {
+  const soma = Object.fromEntries(
+    Object.values(ContaClassificacao).map((c) => [c, 0])
+  ) as Record<ContaClassificacao, number>
+  for (const c of contas) {
+    soma[classificarContaBalancete(c.codigoCompleto, c.codigoConta)] += c.saldo
+  }
+  return soma
+}
+
+/** Calcula KPIs a partir das contas do balancete. */
+export function calcularKpisBalancete(
+  contas: ContaBalancete[],
+  bookId: string,
+  periodo: { inicio: Date; fim: Date }
+): FibKpi {
+  // Soma por subgrupo patrimonial (2 primeiros níveis) — permite liquidez correta.
+  let ativoCirculante = 0
+  let ativoNaoCirculante = 0
+  let passivoCirculante = 0
+  let passivoNaoCirculante = 0
+  let patrimonioLiquido = 0
+  let totalReceitas = 0
+  let totalDespesas = 0
+  for (const c of contas) {
+    switch (subgrupoConta(c.codigoCompleto, c.codigoConta)) {
+      case 'ATIVO_CIRCULANTE': ativoCirculante += c.saldo; break
+      case 'ATIVO_NAO_CIRCULANTE': ativoNaoCirculante += c.saldo; break
+      case 'PASSIVO_CIRCULANTE': passivoCirculante += c.saldo; break
+      case 'PASSIVO_NAO_CIRCULANTE': passivoNaoCirculante += c.saldo; break
+      case 'PATRIMONIO_LIQUIDO': patrimonioLiquido += c.saldo; break
+      case 'RECEITA': totalReceitas += c.saldo; break
+      case 'DESPESA': totalDespesas += c.saldo; break
+    }
+  }
+
+  const ativoTotal = ativoCirculante + ativoNaoCirculante
+  const passivoExigivel = passivoCirculante + passivoNaoCirculante // sem PL
+  const passivoTotal = passivoExigivel
+
+  const lucroOperacional = totalReceitas - totalDespesas
+  const ebitda = lucroOperacional
+  const lucroLiquido = ebitda
+  const margemBruta = totalReceitas > 0 ? lucroOperacional / totalReceitas : 0
+  const margemOperacional = totalReceitas > 0 ? lucroOperacional / totalReceitas : 0
+  const margemLiquida = totalReceitas > 0 ? lucroLiquido / totalReceitas : 0
+
+  // Caixa = contas marcadas como ATIVO_BANCO no Book.
+  const saldoCaixa = contas
+    .filter((c) => c.tipoConta === 'ATIVO_BANCO')
+    .reduce((s, c) => s + c.saldo, 0)
+
+  // Liquidez corrente = Ativo Circulante / Passivo Circulante.
+  // Liquidez geral = Ativo Total / Passivo Exigível (sem PL).
+  const liquidezCorrente = passivoCirculante > 0 ? ativoCirculante / passivoCirculante : 0
+  const liquidezGeral = passivoExigivel > 0 ? ativoTotal / passivoExigivel : 0
+  const endividamento = ativoTotal > 0 ? passivoExigivel / ativoTotal : 0
+  const roi = patrimonioLiquido > 0 ? lucroLiquido / patrimonioLiquido : 0
+
+  return {
+    id: `kpi-bal-${bookId}-${Date.now()}`,
+    importacaoId: bookId,
+    periodo,
+    totalReceitas,
+    totalDespesas,
+    ebitda,
+    lucroLiquido,
+    margemBruta,
+    margemOperacional,
+    margemLiquida,
+    ativoTotal,
+    passivoTotal,
+    patrimonioLiquido,
+    entradaCaixa: Math.max(0, saldoCaixa),
+    saidaCaixa: Math.max(0, -saldoCaixa),
+    saldoCaixa,
+    liquidezGeral,
+    liquidezCorrente,
+    endividamento,
+    roi,
+    criadoEm: new Date(),
+  }
+}
+
+/** Resumo de receita/despesa/ativo de um conjunto de contas (p/ série mensal). */
+export function resumoMensalBalancete(contas: ContaBalancete[]): {
+  receitas: number
+  despesas: number
+  ativo: number
+} {
+  const soma = somarPorClasseBalancete(contas)
+  return {
+    receitas: soma[ContaClassificacao.RECEITA],
+    despesas: soma[ContaClassificacao.DESPESA],
+    ativo: soma[ContaClassificacao.ATIVO],
+  }
+}

@@ -34,31 +34,32 @@ export function FibProvider({ children }: { children: ReactNode }) {
   // Carrega as importações disponíveis na montagem e auto-seleciona a primeira.
   useEffect(() => {
     let ativo = true
-    async function carregarImportacoes() {
+    async function carregarBooks() {
       setCarregandoImportacoes(true)
       try {
-        const resposta = await fetch('/api/fib/importacoes')
+        // Fonte do FIB: balancetes (Books). Ver /api/fib/books.
+        const resposta = await fetch('/api/fib/books')
         if (!resposta.ok) {
-          throw new Error(`Erro ${resposta.status} ao listar importações`)
+          throw new Error(`Erro ${resposta.status} ao listar balancetes`)
         }
         const json = (await resposta.json()) as {
-          importacoes: FibImportacaoResumo[]
+          books: FibImportacaoResumo[]
         }
         if (!ativo) return
-        setImportacoesDisponiveis(json.importacoes)
-        if (json.importacoes.length > 0) {
-          aplicarImportacao(json.importacoes[0])
+        setImportacoesDisponiveis(json.books)
+        if (json.books.length > 0) {
+          aplicarImportacao(json.books[0])
         }
       } catch (err) {
         if (!ativo) return
         const mensagem = err instanceof Error ? err.message : String(err)
         setErro(mensagem)
-        console.error('Erro ao carregar importações FIB:', err)
+        console.error('Erro ao carregar balancetes FIB:', err)
       } finally {
         if (ativo) setCarregandoImportacoes(false)
       }
     }
-    carregarImportacoes()
+    carregarBooks()
     return () => {
       ativo = false
     }
@@ -109,11 +110,9 @@ export function FibProvider({ children }: { children: ReactNode }) {
     setErro(null)
 
     try {
-      const query = new URLSearchParams({
-        importacaoId: importacaoAtual.id,
-        periodoInicio: periodoSelecionado.inicio.toISOString(),
-        periodoFim: periodoSelecionado.fim.toISOString(),
-      })
+      // A fonte do FIB é o balancete de um Book (bookId). O período vem do mês
+      // do Book; o backend ignora datas (o balancete é o mês inteiro).
+      const query = new URLSearchParams({ bookId: importacaoAtual.id })
 
       const resposta = await fetch(`/api/fib/dashboard?${query}`)
 

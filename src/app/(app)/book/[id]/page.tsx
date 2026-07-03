@@ -5,6 +5,8 @@ import { StatusFicha } from '@/lib/types/book'
 import { FichaCard } from '@/components/book/FichaCard'
 import { UploadPdfSuporte } from '@/components/book/UploadPdfSuporte'
 import { AcoesBook } from '@/components/book/AcoesBook'
+import { StatusBook } from '@/components/book/StatusBook'
+import type { BookStatus } from '@/lib/types/book'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,6 +54,8 @@ export default async function BookDashboardPage({ params }: { params: { id: stri
           Ocorrências ({book._count.ocorrencias})
         </Link>
       </div>
+
+      <StatusBook bookId={book.id} status={book.status as BookStatus} />
 
       <UploadPdfSuporte bookId={book.id} />
 

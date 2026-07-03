@@ -40,7 +40,6 @@ export function FibTopBar() {
     importacaoAtual,
     selecionarImportacao,
     periodoSelecionado,
-    definirPeriodo,
     carregandoImportacoes,
     dados,
   } = useFibContext()
@@ -89,8 +88,8 @@ export function FibTopBar() {
             <select
               className="px-3 py-2 rounded bg-slate-800 border border-slate-700 text-sm
                 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500
-                disabled:opacity-50 max-w-xs"
-              aria-label="Selecione empresa/importação"
+                disabled:opacity-50 max-w-md"
+              aria-label="Selecione o balancete"
               value={importacaoAtual?.id ?? ''}
               onChange={(e) => selecionarImportacao(e.target.value)}
               disabled={carregandoImportacoes || importacoesDisponiveis.length === 0}
@@ -98,7 +97,7 @@ export function FibTopBar() {
               {carregandoImportacoes ? (
                 <option value="">Carregando…</option>
               ) : importacoesDisponiveis.length === 0 ? (
-                <option value="">Nenhuma importação</option>
+                <option value="">Nenhum balancete</option>
               ) : (
                 importacoesDisponiveis.map((imp) => (
                   <option key={imp.id} value={imp.id}>
@@ -108,37 +107,13 @@ export function FibTopBar() {
               )}
             </select>
 
-            <input
-              type="date"
-              className="px-3 py-2 rounded bg-slate-800 border border-slate-700 text-sm
-                hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              aria-label="Data inicial"
-              value={paraInputDate(periodoSelecionado?.inicio)}
-              onChange={(e) =>
-                definirPeriodo(
-                  e.target.value ? new Date(`${e.target.value}T00:00:00`) : null,
-                  null
-                )
-              }
-            />
-
-            <span className="text-slate-500">até</span>
-
-            <input
-              type="date"
-              className="px-3 py-2 rounded bg-slate-800 border border-slate-700 text-sm
-                hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              aria-label="Data final"
-              value={paraInputDate(periodoSelecionado?.fim)}
-              onChange={(e) =>
-                definirPeriodo(
-                  null,
-                  e.target.value
-                    ? new Date(`${e.target.value}T23:59:59.999`)
-                    : null
-                )
-              }
-            />
+            {/* Período é o mês do balancete (somente leitura). */}
+            {periodoSelecionado && (
+              <span className="px-3 py-2 rounded bg-slate-800/60 border border-slate-700 text-sm text-slate-300">
+                {paraInputDate(periodoSelecionado.inicio)} a{' '}
+                {paraInputDate(periodoSelecionado.fim)}
+              </span>
+            )}
           </div>
 
           {/* Botões de Exportação */}

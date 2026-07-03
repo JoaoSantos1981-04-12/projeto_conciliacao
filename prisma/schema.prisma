@@ -242,6 +242,10 @@ model FichaConciliacao {
   bookId             String
   tipoConta          TipoConta
   codigoConta        String
+  // Código hierárquico completo (ex.: "1.01.01.01.100006"); o balancete é a
+  // única fonte com os níveis sintéticos. `codigoConta` segue sendo o leaf de
+  // 6 dígitos (chave de amarração razão↔balancete↔relatório).
+  codigoCompleto     String?
   nomeConta          String
   saldoRazao         Decimal     @default(0) @db.Decimal(18, 2)
   saldoBalancete     Decimal     @default(0) @db.Decimal(18, 2)
